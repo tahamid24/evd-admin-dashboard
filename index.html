@@ -1,0 +1,282 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EVD — Admin Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090909;color:#f5f5f5;font-family:Arial,sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.login{min-height:100vh;display:grid;place-items:center;padding:20px}
+.login-card{width:100%;max-width:390px;background:#141414;border:1px solid #292929;border-radius:18px;padding:30px}
+.logo{font-size:25px;font-weight:800;letter-spacing:-1px}
+.muted{color:#929292;font-size:13px}
+input{width:100%;padding:13px;margin:9px 0 15px;background:#090909;color:white;border:1px solid #333;border-radius:9px;outline:none}
+input:focus{border-color:#aaa}
+button{border:0;border-radius:9px;padding:12px 17px;background:#fff;color:#000;font-weight:700}
+button:disabled{opacity:.5}
+.error{color:#ff7777;font-size:13px;min-height:18px}
+.app{max-width:1200px;margin:auto;padding:25px}
+header{display:flex;justify-content:space-between;align-items:center;gap:15px;padding-bottom:25px;border-bottom:1px solid #292929}
+header button{background:#202020;color:white;border:1px solid #333}
+h1{font-size:25px;margin:0 0 5px}
+h2{font-size:16px;margin:0 0 17px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:25px 0}
+.card,.panel{background:#141414;border:1px solid #292929;border-radius:13px;padding:19px}
+.stat{font-size:30px;font-weight:800;margin-top:12px}
+.stat-label{font-size:13px;color:#999}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #292929;font-size:13px}
+.row:last-child{border:0}
+.value{color:#aaa;text-align:right;overflow-wrap:anywhere}
+.status{margin:18px 0;color:#aaa;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #292929}
+th{color:#999}
+.table-wrap{overflow-x:auto}
+#refresh{margin-top:15px}
+@media(max-width:750px){.grid{grid-template-columns:repeat(2,1fr)}.panels{grid-template-columns:1fr}.app{padding:17px}}
+@media(max-width:380px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<section id="login" class="login">
+  <div class="login-card">
+    <div class="logo">EVD<span style="color:#888">.</span></div>
+    <p class="muted">PRIVATE ADMIN DASHBOARD</p>
+    <h2 style="margin-top:30px">Welcome back</h2>
+    <form id="loginForm">
+      <label class="muted">Admin email</label>
+      <input id="email" type="email" placeholder="Your Gmail address" required>
+      <label class="muted">Password</label>
+      <input id="password" type="password" placeholder="Supabase account password" required>
+      <button id="loginButton" type="submit" style="width:100%">Sign in</button>
+    </form>
+    <p id="loginError" class="error"></p>
+    <p class="muted">Authorized administrators only.</p>
+  </div>
+</section>
+
+<section id="dashboard" class="app hidden">
+  <header>
+    <div>
+      <div class="logo">EVD<span style="color:#888">.</span></div>
+      <div class="muted">Analytics / Overview</div>
+    </div>
+    <button id="logout">Sign out</button>
+  </header>
+
+  <div class="status" id="status">Loading analytics...</div>
+
+  <div class="grid">
+    <div class="card"><div class="stat-label">TOTAL DEVICES</div><div class="stat" id="devices">—</div></div>
+    <div class="card"><div class="stat-label">TOTAL DOWNLOADS</div><div class="stat" id="downloads">—</div></div>
+    <div class="card"><div class="stat-label">SUCCESSFUL</div><div class="stat" id="successful">—</div></div>
+    <div class="card"><div class="stat-label">FAILED</div><div class="stat" id="failed">—</div></div>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>Countries</h2>
+      <div id="countries"></div>
+    </div>
+    <div class="panel">
+      <h2>Device models</h2>
+      <div id="models"></div>
+    </div>
+    <div class="panel">
+      <h2>Download platforms</h2>
+      <div id="platforms"></div>
+    </div>
+    <div class="panel">
+      <h2>Download formats</h2>
+      <div id="formats"></div>
+    </div>
+    <div class="panel">
+      <h2>Android versions</h2>
+      <div id="android"></div>
+    </div>
+    <div class="panel">
+      <h2>App events</h2>
+      <div id="events"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:15px">
+    <h2>Recent downloads</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>PLATFORM</th><th>FORMAT</th><th>STATUS</th><th>DATE</th></tr></thead>
+        <tbody id="recent"></tbody>
+      </table>
+    </div>
+    <button id="refresh">Refresh analytics</button>
+  </div>
+  <p class="muted" style="text-align:center;margin-top:30px">EVD Analytics · Private Admin Dashboard</p>
+</section>
+
+<script>
+const SUPABASE_URL = "https://zphnhmzgdvcdqefjvafr.supabase.co/rest/v1/";
+const SUPABASE_KEY = "sb_publishable_EqgJ9N2iTFpkYUg_0m9FZA_tNPv7kIu";
+
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = id => document.getElementById(id);
+
+function showLogin(){
+  $("dashboard").classList.add("hidden");
+  $("login").classList.remove("hidden");
+}
+
+function showDashboard(){
+  $("login").classList.add("hidden");
+  $("dashboard").classList.remove("hidden");
+}
+
+function countBy(items,key){
+  const counts={};
+  items.forEach(item=>{
+    const name=item[key] || "Unknown";
+    counts[name]=(counts[name]||0)+1;
+  });
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+}
+
+function renderList(id,items){
+  const el=$(id);
+  if(!items.length){
+    el.innerHTML='<p class="muted">No data yet</p>';
+    return;
+  }
+  el.replaceChildren();
+  items.slice(0,12).forEach(([name,count])=>{
+    const row=document.createElement("div");
+    row.className="row";
+    const a=document.createElement("span");
+    const b=document.createElement("span");
+    a.textContent=name;
+    b.textContent=count;
+    b.className="value";
+    row.append(a,b);
+    el.appendChild(row);
+  });
+}
+
+async function loadAnalytics(){
+  $("status").textContent="Loading analytics...";
+
+  const [devicesResult,downloadsResult,eventsResult]=await Promise.all([
+    db.from("devices").select("manufacturer,model,android_version,country,app_version"),
+    db.from("download_events").select("source_domain,status,format,created_at").order("created_at",{ascending:false}),
+    db.from("app_events").select("event_name,created_at").order("created_at",{ascending:false})
+  ]);
+
+  const errors=[devicesResult.error,downloadsResult.error,eventsResult.error].filter(Boolean);
+  if(errors.length){
+    $("status").textContent="Analytics error: "+errors.map(e=>e.message).join(" | ");
+    return;
+  }
+
+  const devices=devicesResult.data||[];
+  const downloads=downloadsResult.data||[];
+  const events=eventsResult.data||[];
+
+  $("devices").textContent=devices.length;
+  $("downloads").textContent=downloads.length;
+
+  const success=downloads.filter(x=>x.status==="success").length;
+  const failed=downloads.filter(x=>x.status==="failed").length;
+
+  $("successful").textContent=success;
+  $("failed").textContent=failed;
+
+  renderList("countries",countBy(devices,"country"));
+  renderList("models",countBy(devices,"model"));
+  renderList("platforms",countBy(downloads,"source_domain"));
+  renderList("formats",countBy(downloads,"format"));
+  renderList("android",countBy(devices,"android_version"));
+  renderList("events",countBy(events,"event_name"));
+
+  const recent=$("recent");
+  recent.replaceChildren();
+
+  if(!downloads.length){
+    const tr=document.createElement("tr");
+    const td=document.createElement("td");
+    td.colSpan=4;
+    td.textContent="No downloads recorded yet";
+    tr.appendChild(td);
+    recent.appendChild(tr);
+  }else{
+    downloads.slice(0,15).forEach(item=>{
+      const tr=document.createElement("tr");
+      [
+        item.source_domain||"Unknown",
+        item.format||"Unknown",
+        item.status||"Unknown",
+        item.created_at?new Date(item.created_at).toLocaleString():"—"
+      ].forEach(value=>{
+        const td=document.createElement("td");
+        td.textContent=value;
+        tr.appendChild(td);
+      });
+      recent.appendChild(tr);
+    });
+  }
+
+  $("status").textContent="Last updated: "+new Date().toLocaleString();
+}
+
+$("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  $("loginButton").disabled=true;
+  $("loginError").textContent="Signing in...";
+
+  const {error}=await db.auth.signInWithPassword({
+    email:$("email").value.trim(),
+    password:$("password").value
+  });
+
+  $("loginButton").disabled=false;
+
+  if(error){
+    $("loginError").textContent=error.message;
+    return;
+  }
+
+  $("loginError").textContent="";
+  showDashboard();
+  await loadAnalytics();
+});
+
+$("logout").addEventListener("click",async()=>{
+  await db.auth.signOut();
+  showLogin();
+});
+
+$("refresh").addEventListener("click",loadAnalytics);
+
+db.auth.onAuthStateChange((event,session)=>{
+  if(session && event==="SIGNED_IN"){
+    showDashboard();
+  }
+});
+
+(async()=>{
+  const {data}=await db.auth.getSession();
+  if(data.session){
+    showDashboard();
+    await loadAnalytics();
+  }else{
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
