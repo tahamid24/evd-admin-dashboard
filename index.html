@@ -507,7 +507,10 @@ $("sendNotification").addEventListener("click", async () => {
    { body: { title, body } }
   );
 
-  if (error) throw error;
+  if (error) {
+ const details = await error.context?.json().catch(() => null);
+ throw new Error(details?.error || details?.message || error.message);
+}
 
   status.textContent =
    `Notification sent! Successful: ${data.sent}, Failed: ${data.failed}`;
