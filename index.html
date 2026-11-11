@@ -1,281 +1,506 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EVD — Admin Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090909">
+<title>EVD — Analytics</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+:root{color-scheme:dark;--bg:#090909;--panel:#141414;--line:#292929;--muted:#929292;--white:#f5f5f5}
 *{box-sizing:border-box}
-body{margin:0;background:#090909;color:#f5f5f5;font-family:Arial,sans-serif}
+body{margin:0;background:var(--bg);color:var(--white);font-family:Arial,sans-serif}
 button,input{font:inherit}
 button{cursor:pointer}
 .hidden{display:none!important}
+.muted{color:var(--muted)}
+.small{font-size:12px}
 .login{min-height:100vh;display:grid;place-items:center;padding:20px}
-.login-card{width:100%;max-width:390px;background:#141414;border:1px solid #292929;border-radius:18px;padding:30px}
-.logo{font-size:25px;font-weight:800;letter-spacing:-1px}
-.muted{color:#929292;font-size:13px}
-input{width:100%;padding:13px;margin:9px 0 15px;background:#090909;color:white;border:1px solid #333;border-radius:9px;outline:none}
-input:focus{border-color:#aaa}
-button{border:0;border-radius:9px;padding:12px 17px;background:#fff;color:#000;font-weight:700}
+.login-card{width:100%;max-width:390px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px}
+.logo{font-size:26px;font-weight:900;letter-spacing:-1px}
+input{width:100%;padding:13px;margin:9px 0 15px;background:#090909;color:white;border:1px solid #333;border-radius:9px}
+button{padding:11px 15px;border:1px solid #333;border-radius:9px;background:#202020;color:white;font-weight:700}
+button.primary{background:white;color:black;border-color:white}
 button:disabled{opacity:.5}
 .error{color:#ff7777;font-size:13px;min-height:18px}
-.app{max-width:1200px;margin:auto;padding:25px}
-header{display:flex;justify-content:space-between;align-items:center;gap:15px;padding-bottom:25px;border-bottom:1px solid #292929}
-header button{background:#202020;color:white;border:1px solid #333}
-h1{font-size:25px;margin:0 0 5px}
-h2{font-size:16px;margin:0 0 17px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:25px 0}
-.card,.panel{background:#141414;border:1px solid #292929;border-radius:13px;padding:19px}
-.stat{font-size:30px;font-weight:800;margin-top:12px}
-.stat-label{font-size:13px;color:#999}
-.panels{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #292929;font-size:13px}
+.app{max-width:1250px;margin:auto;padding:25px}
+header{display:flex;align-items:center;justify-content:space-between;gap:15px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+h1{font-size:23px;margin:0 0 5px}
+h2{font-size:15px;margin:0 0 17px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:23px 0}
+.filters{display:flex;gap:7px;flex-wrap:wrap}
+.filters button{font-size:12px;padding:9px 12px}
+.filters button.active{background:white;color:black;border-color:white}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:15px}
+.card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px;min-width:0}
+.stat{font-size:30px;font-weight:800;margin-top:12px;overflow-wrap:anywhere}
+.stat-label{font-size:11px;color:var(--muted);letter-spacing:.5px}
+.panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.chart{width:100%;height:230px;display:block}
+.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}
 .row:last-child{border:0}
 .value{color:#aaa;text-align:right;overflow-wrap:anywhere}
-.status{margin:18px 0;color:#aaa;font-size:13px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #292929}
-th{color:#999}
 .table-wrap{overflow-x:auto}
-#refresh{margin-top:15px}
-@media(max-width:750px){.grid{grid-template-columns:repeat(2,1fr)}.panels{grid-template-columns:1fr}.app{padding:17px}}
+table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+th,td{text-align:left;padding:12px 9px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-size:10px;letter-spacing:.5px}
+.status{margin:15px 0;color:var(--muted);font-size:12px}
+.tag{display:inline-block;border:1px solid #333;border-radius:20px;padding:4px 8px;font-size:11px}
+.success{color:#8de0a7}
+.failed{color:#ff8c8c}
+.empty{color:var(--muted);font-size:13px;padding:12px 0}
+footer{text-align:center;padding:30px 0;color:var(--muted);font-size:11px}
+@media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.panels{grid-template-columns:1fr}.app{padding:16px}}
 @media(max-width:380px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
 <section id="login" class="login">
-  <div class="login-card">
-    <div class="logo">EVD<span style="color:#888">.</span></div>
-    <p class="muted">PRIVATE ADMIN DASHBOARD</p>
-    <h2 style="margin-top:30px">Welcome back</h2>
-    <form id="loginForm">
-      <label class="muted">Admin email</label>
-      <input id="email" type="email" placeholder="Your Gmail address" required>
-      <label class="muted">Password</label>
-      <input id="password" type="password" placeholder="Supabase account password" required>
-      <button id="loginButton" type="submit" style="width:100%">Sign in</button>
-    </form>
-    <p id="loginError" class="error"></p>
-    <p class="muted">Authorized administrators only.</p>
-  </div>
+ <div class="login-card">
+  <div class="logo">EVD<span class="muted">.</span></div>
+  <p class="muted small">PRIVATE ADMIN ANALYTICS</p>
+  <h2 style="margin-top:30px">Welcome back</h2>
+  <form id="loginForm">
+   <label class="muted small">Admin email</label>
+   <input id="email" type="email" placeholder="Your Gmail address" required>
+   <label class="muted small">Password</label>
+   <input id="password" type="password" placeholder="Supabase password" required>
+   <button class="primary" id="loginButton" style="width:100%">Sign in</button>
+  </form>
+  <p id="loginError" class="error"></p>
+  <p class="muted small">Authorized administrators only.</p>
+ </div>
 </section>
 
 <section id="dashboard" class="app hidden">
-  <header>
-    <div>
-      <div class="logo">EVD<span style="color:#888">.</span></div>
-      <div class="muted">Analytics / Overview</div>
-    </div>
-    <button id="logout">Sign out</button>
-  </header>
-
-  <div class="status" id="status">Loading analytics...</div>
-
-  <div class="grid">
-    <div class="card"><div class="stat-label">TOTAL DEVICES</div><div class="stat" id="devices">—</div></div>
-    <div class="card"><div class="stat-label">TOTAL DOWNLOADS</div><div class="stat" id="downloads">—</div></div>
-    <div class="card"><div class="stat-label">SUCCESSFUL</div><div class="stat" id="successful">—</div></div>
-    <div class="card"><div class="stat-label">FAILED</div><div class="stat" id="failed">—</div></div>
+ <header>
+  <div>
+   <div class="logo">EVD<span class="muted">.</span></div>
+   <div class="muted small">Analytics / Overview</div>
   </div>
+  <button id="logout">Sign out</button>
+ </header>
 
-  <div class="panels">
-    <div class="panel">
-      <h2>Countries</h2>
-      <div id="countries"></div>
-    </div>
-    <div class="panel">
-      <h2>Device models</h2>
-      <div id="models"></div>
-    </div>
-    <div class="panel">
-      <h2>Download platforms</h2>
-      <div id="platforms"></div>
-    </div>
-    <div class="panel">
-      <h2>Download formats</h2>
-      <div id="formats"></div>
-    </div>
-    <div class="panel">
-      <h2>Android versions</h2>
-      <div id="android"></div>
-    </div>
-    <div class="panel">
-      <h2>App events</h2>
-      <div id="events"></div>
-    </div>
+ <div class="toolbar">
+  <div>
+   <h1>Overview</h1>
+   <div class="muted small">Your EVD app performance</div>
   </div>
+  <div class="filters" id="filters">
+   <button data-days="7" class="active">7 days</button>
+   <button data-days="30">30 days</button>
+   <button data-days="90">90 days</button>
+   <button data-days="all">All time</button>
+  </div>
+ </div>
 
-  <div class="panel" style="margin-top:15px">
-    <h2>Recent downloads</h2>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>PLATFORM</th><th>FORMAT</th><th>STATUS</th><th>DATE</th></tr></thead>
-        <tbody id="recent"></tbody>
-      </table>
-    </div>
-    <button id="refresh">Refresh analytics</button>
+ <div id="status" class="status">Loading analytics...</div>
+
+ <div class="grid">
+  <div class="card"><div class="stat-label">TOTAL DEVICES</div><div class="stat" id="devices">—</div><div class="muted small">All registered devices</div></div>
+  <div class="card"><div class="stat-label">ACTIVE DEVICES</div><div class="stat" id="activeDevices">—</div><div class="muted small">Seen during selected period</div></div>
+  <div class="card"><div class="stat-label">TOTAL DOWNLOADS</div><div class="stat" id="downloads">—</div><div class="muted small">Selected period</div></div>
+  <div class="card"><div class="stat-label">ACTIVE USERS</div><div class="stat" id="activeUsers">—</div><div class="muted small">Unique app-open users</div></div>
+  <div class="card"><div class="stat-label">SUCCESSFUL DOWNLOADS</div><div class="stat success" id="successful">—</div></div>
+  <div class="card"><div class="stat-label">FAILED DOWNLOADS</div><div class="stat failed" id="failed">—</div></div>
+  <div class="card"><div class="stat-label">SUCCESS RATE</div><div class="stat" id="successRate">—</div></div>
+  <div class="card"><div class="stat-label">COUNTRIES</div><div class="stat" id="countryCount">—</div></div>
+ </div>
+
+ <div class="panels">
+  <div class="panel">
+   <h2>Download activity</h2>
+   <canvas id="activityChart" class="chart"></canvas>
   </div>
-  <p class="muted" style="text-align:center;margin-top:30px">EVD Analytics · Private Admin Dashboard</p>
+  <div class="panel">
+   <h2>Download results</h2>
+   <canvas id="resultChart" class="chart"></canvas>
+  </div>
+  <div class="panel"><h2>Top countries</h2><div id="countries"></div></div>
+  <div class="panel"><h2>Device models</h2><div id="models"></div></div>
+  <div class="panel"><h2>Android versions</h2><div id="android"></div></div>
+  <div class="panel"><h2>App versions</h2><div id="appVersions"></div></div>
+  <div class="panel"><h2>Popular platforms</h2><div id="platforms"></div></div>
+  <div class="panel"><h2>Popular formats</h2><div id="formats"></div></div>
+  <div class="panel"><h2>App events</h2><div id="events"></div></div>
+  <div class="panel"><h2>Device manufacturers</h2><div id="manufacturers"></div></div>
+ </div>
+
+ <div class="panel" style="margin-top:15px">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+   <h2 style="margin:0">Recent downloads</h2>
+   <span class="muted small" id="recentCount"></span>
+  </div>
+  <div class="table-wrap" style="margin-top:15px">
+   <table>
+    <thead><tr><th>PLATFORM</th><th>FORMAT</th><th>STATUS</th><th>DATE</th></tr></thead>
+    <tbody id="recent"></tbody>
+   </table>
+  </div>
+ </div>
+
+ <div class="toolbar">
+  <span class="muted small" id="lastUpdated">Not updated yet</span>
+  <button class="primary" id="refresh">Refresh analytics</button>
+ </div>
+ <footer>EDGE VIDEO DOWNLOADER · PRIVATE ADMIN DASHBOARD</footer>
 </section>
 
 <script>
 const SUPABASE_URL = "https://zphnhmzgdvcdqefjvafr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EqgJ9N2iTFpkYUg_0m9FZA_tNPv7kIu";
+const ADMIN_USER_ID = "dde6584a-93e4-4982-bca3-3f4f02603482";
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 const $ = id => document.getElementById(id);
+let selectedDays = "7";
+let busy = false;
 
 function showLogin(){
-  $("dashboard").classList.add("hidden");
-  $("login").classList.remove("hidden");
+ $("dashboard").classList.add("hidden");
+ $("login").classList.remove("hidden");
+}
+function showDashboard(){
+ $("login").classList.add("hidden");
+ $("dashboard").classList.remove("hidden");
+}
+function setStatus(message){$("status").textContent=message;}
+
+function startDate(){
+ if(selectedDays==="all")return null;
+ const d=new Date();
+ d.setDate(d.getDate()-Number(selectedDays)+1);
+ d.setHours(0,0,0,0);
+ return d.toISOString();
 }
 
-function showDashboard(){
-  $("login").classList.add("hidden");
-  $("dashboard").classList.remove("hidden");
+async function getAllRows(table,columns,dateColumn){
+ const rows=[];
+ const pageSize=1000;
+ let from=0;
+ while(true){
+  let query=db.from(table).select(columns).order(dateColumn,{ascending:false});
+  const start=startDate();
+  if(start)query=query.gte(dateColumn,start);
+  const {data,error}=await query.range(from,from+pageSize-1);
+  if(error)throw error;
+  const batch=data||[];
+  rows.push(...batch);
+  if(batch.length<pageSize)break;
+  from+=pageSize;
+ }
+ return rows;
+}
+
+async function getAllDevices(){
+ const rows=[];
+ const pageSize=1000;
+ let from=0;
+ while(true){
+  const {data,error}=await db.from("devices")
+   .select("manufacturer,model,android_version,app_version,country,first_seen,last_seen")
+   .order("last_seen",{ascending:false})
+   .range(from,from+pageSize-1);
+  if(error)throw error;
+  const batch=data||[];
+  rows.push(...batch);
+  if(batch.length<pageSize)break;
+  from+=pageSize;
+ }
+ return rows;
 }
 
 function countBy(items,key){
-  const counts={};
-  items.forEach(item=>{
-    const name=item[key] || "Unknown";
-    counts[name]=(counts[name]||0)+1;
-  });
-  return Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+ const counts={};
+ items.forEach(item=>{
+  const name=item[key]||"Unknown";
+  counts[name]=(counts[name]||0)+1;
+ });
+ return Object.entries(counts).sort((a,b)=>b[1]-a[1]);
 }
 
 function renderList(id,items){
-  const el=$(id);
-  if(!items.length){
-    el.innerHTML='<p class="muted">No data yet</p>';
-    return;
+ const el=$(id);
+ el.replaceChildren();
+ if(!items.length){
+  const p=document.createElement("p");
+  p.className="empty";
+  p.textContent="No data available";
+  el.appendChild(p);
+  return;
+ }
+ items.slice(0,10).forEach(([name,count])=>{
+  const row=document.createElement("div");
+  row.className="row";
+  const a=document.createElement("span");
+  const b=document.createElement("span");
+  a.textContent=name;
+  b.textContent=count;
+  b.className="value";
+  row.append(a,b);
+  el.appendChild(row);
+ });
+}
+
+function drawActivity(canvasId,downloads){
+ const canvas=$(canvasId);
+ const rect=canvas.getBoundingClientRect();
+ const width=Math.max(280,rect.width);
+ const height=230;
+ const ratio=window.devicePixelRatio||1;
+ canvas.width=width*ratio;
+ canvas.height=height*ratio;
+ const ctx=canvas.getContext("2d");
+ ctx.scale(ratio,ratio);
+ ctx.clearRect(0,0,width,height);
+
+ const days=selectedDays==="all"?30:Number(selectedDays);
+ const count=Math.min(days,30);
+ const labels=[];
+ const values={};
+ for(let i=count-1;i>=0;i--){
+  const d=new Date();
+  d.setDate(d.getDate()-i);
+  const key=d.toLocaleDateString();
+  labels.push({key,label:(d.getMonth()+1)+"/"+d.getDate()});
+  values[key]=0;
+ }
+ downloads.forEach(item=>{
+  if(!item.created_at)return;
+  const key=new Date(item.created_at).toLocaleDateString();
+  if(key in values)values[key]++;
+ });
+
+ const max=Math.max(1,...Object.values(values));
+ const left=27,right=8,top=12,bottom=30;
+ const chartW=width-left-right;
+ const chartH=height-top-bottom;
+ ctx.font="10px Arial";
+ ctx.fillStyle="#888";
+ ctx.strokeStyle="#292929";
+ ctx.lineWidth=1;
+
+ for(let i=0;i<=4;i++){
+  const y=top+chartH*i/4;
+  ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(width-right,y);ctx.stroke();
+  ctx.fillText(String(Math.round(max*(4-i)/4)),2,y+3);
+ }
+
+ const gap=4;
+ const barW=Math.max(2,(chartW-gap*(count-1))/count);
+ labels.forEach((item,i)=>{
+  const value=values[item.key];
+  const barH=value/max*(chartH-5);
+  const x=left+i*(barW+gap);
+  ctx.fillStyle="#f1f1f1";
+  ctx.fillRect(x,top+chartH-barH,barW,barH);
+  if(count<=14||i%Math.ceil(count/7)===0||i===count-1){
+   ctx.fillStyle="#888";
+   ctx.fillText(item.label,x,height-9);
   }
-  el.replaceChildren();
-  items.slice(0,12).forEach(([name,count])=>{
-    const row=document.createElement("div");
-    row.className="row";
-    const a=document.createElement("span");
-    const b=document.createElement("span");
-    a.textContent=name;
-    b.textContent=count;
-    b.className="value";
-    row.append(a,b);
-    el.appendChild(row);
-  });
+ });
+}
+
+function drawResults(downloads){
+ const canvas=$("resultChart");
+ const width=Math.max(280,canvas.getBoundingClientRect().width);
+ const height=230;
+ const ratio=window.devicePixelRatio||1;
+ canvas.width=width*ratio;
+ canvas.height=height*ratio;
+ const ctx=canvas.getContext("2d");
+ ctx.scale(ratio,ratio);
+ ctx.clearRect(0,0,width,height);
+
+ const success=downloads.filter(x=>x.status==="success").length;
+ const failed=downloads.filter(x=>x.status==="failed").length;
+ const total=success+failed;
+ const cx=width/2,cy=95,r=66,thickness=19;
+
+ ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+ ctx.strokeStyle="#303030";ctx.lineWidth=thickness;ctx.stroke();
+
+ if(total){
+  const angle=success/total*Math.PI*2;
+  ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+angle);
+  ctx.strokeStyle="#f5f5f5";ctx.lineWidth=thickness;ctx.stroke();
+
+  ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2+angle,Math.PI*1.5);
+  ctx.strokeStyle="#777";ctx.lineWidth=thickness;ctx.stroke();
+ }
+
+ ctx.textAlign="center";
+ ctx.fillStyle="#fff";ctx.font="bold 25px Arial";
+ ctx.fillText(total?Math.round(success/total*100)+"%":"—",cx,cy+8);
+ ctx.font="11px Arial";ctx.fillStyle="#999";
+ ctx.fillText("SUCCESS RATE",cx,cy+25);
+ ctx.textAlign="left";
+ ctx.fillStyle="#f5f5f5";
+ ctx.fillRect(cx-88,190,9,9);
+ ctx.fillStyle="#aaa";ctx.fillText("Success: "+success,cx-74,199);
+ ctx.fillStyle="#777";
+ ctx.fillRect(cx+12,190,9,9);
+ ctx.fillStyle="#aaa";ctx.fillText("Failed: "+failed,cx+26,199);
 }
 
 async function loadAnalytics(){
-  $("status").textContent="Loading analytics...";
+ if(busy)return;
+ busy=true;
+ $("refresh").disabled=true;
+ setStatus("Loading analytics...");
 
-  const [devicesResult,downloadsResult,eventsResult]=await Promise.all([
-    db.from("devices").select("manufacturer,model,android_version,country,app_version"),
-    db.from("download_events").select("source_domain,status,format,created_at").order("created_at",{ascending:false}),
-    db.from("app_events").select("event_name,created_at").order("created_at",{ascending:false})
-  ]);
-
-  const errors=[devicesResult.error,downloadsResult.error,eventsResult.error].filter(Boolean);
-  if(errors.length){
-    $("status").textContent="Analytics error: "+errors.map(e=>e.message).join(" | ");
-    return;
+ try{
+  const {data:userData,error:userError}=await db.auth.getUser();
+  if(userError||!userData.user||userData.user.id!==ADMIN_USER_ID){
+   await db.auth.signOut();
+   showLogin();
+   $("loginError").textContent="This account is not authorized to access EVD Analytics.";
+   return;
   }
 
-  const devices=devicesResult.data||[];
-  const downloads=downloadsResult.data||[];
-  const events=eventsResult.data||[];
+  const [devices,downloads,events]=await Promise.all([
+   getAllDevices(),
+   getAllRows("download_events","source_domain,status,format,created_at","created_at"),
+   getAllRows("app_events","event_name,created_at,user_id","created_at")
+  ]);
 
-  $("devices").textContent=devices.length;
-  $("downloads").textContent=downloads.length;
+  const start=startDate();
+  const activeDevices=start
+   ?devices.filter(d=>d.last_seen&&d.last_seen>=start).length
+   :devices.length;
+
+  const appOpens=events.filter(e=>e.event_name==="app_open");
+  const activeUsers=new Set(appOpens.map(e=>e.user_id).filter(Boolean)).size;
 
   const success=downloads.filter(x=>x.status==="success").length;
   const failed=downloads.filter(x=>x.status==="failed").length;
+  const rate=downloads.length?Math.round(success/downloads.length*100):0;
 
+  $("devices").textContent=devices.length;
+  $("activeDevices").textContent=activeDevices;
+  $("downloads").textContent=downloads.length;
+  $("activeUsers").textContent=activeUsers;
   $("successful").textContent=success;
   $("failed").textContent=failed;
+  $("successRate").textContent=rate+"%";
+  $("countryCount").textContent=new Set(devices.map(d=>d.country).filter(Boolean)).size;
 
   renderList("countries",countBy(devices,"country"));
   renderList("models",countBy(devices,"model"));
+  renderList("android",countBy(devices,"android_version"));
+  renderList("appVersions",countBy(devices,"app_version"));
+  renderList("manufacturers",countBy(devices,"manufacturer"));
   renderList("platforms",countBy(downloads,"source_domain"));
   renderList("formats",countBy(downloads,"format"));
-  renderList("android",countBy(devices,"android_version"));
   renderList("events",countBy(events,"event_name"));
+
+  drawActivity("activityChart",downloads);
+  drawResults(downloads);
 
   const recent=$("recent");
   recent.replaceChildren();
+  $("recentCount").textContent=downloads.length+" records in selected period";
 
   if(!downloads.length){
-    const tr=document.createElement("tr");
-    const td=document.createElement("td");
-    td.colSpan=4;
-    td.textContent="No downloads recorded yet";
-    tr.appendChild(td);
-    recent.appendChild(tr);
+   const tr=document.createElement("tr");
+   const td=document.createElement("td");
+   td.colSpan=4;td.textContent="No downloads in this period";
+   tr.appendChild(td);recent.appendChild(tr);
   }else{
-    downloads.slice(0,15).forEach(item=>{
-      const tr=document.createElement("tr");
-      [
-        item.source_domain||"Unknown",
-        item.format||"Unknown",
-        item.status||"Unknown",
-        item.created_at?new Date(item.created_at).toLocaleString():"—"
-      ].forEach(value=>{
-        const td=document.createElement("td");
-        td.textContent=value;
-        tr.appendChild(td);
-      });
-      recent.appendChild(tr);
+   downloads.slice(0,20).forEach(item=>{
+    const tr=document.createElement("tr");
+    const values=[
+     item.source_domain||"Unknown",
+     item.format||"Unknown",
+     item.status||"Unknown",
+     item.created_at?new Date(item.created_at).toLocaleString():"—"
+    ];
+    values.forEach((value,index)=>{
+     const td=document.createElement("td");
+     td.textContent=value;
+     if(index===2)td.className=value==="success"?"success":"failed";
+     tr.appendChild(td);
     });
+    recent.appendChild(tr);
+   });
   }
 
-  $("status").textContent="Last updated: "+new Date().toLocaleString();
+  setStatus("Analytics loaded successfully.");
+  $("lastUpdated").textContent="Last refreshed: "+new Date().toLocaleString();
+
+ }catch(error){
+  setStatus("Unable to load analytics: "+(error.message||"Unknown error"));
+ }finally{
+  busy=false;
+  $("refresh").disabled=false;
+ }
 }
 
 $("loginForm").addEventListener("submit",async e=>{
-  e.preventDefault();
-  $("loginButton").disabled=true;
-  $("loginError").textContent="Signing in...";
+ e.preventDefault();
+ $("loginButton").disabled=true;
+ $("loginError").textContent="Signing in...";
 
-  const {error}=await db.auth.signInWithPassword({
-    email:$("email").value.trim(),
-    password:$("password").value
-  });
+ const {error}=await db.auth.signInWithPassword({
+  email:$("email").value.trim(),
+  password:$("password").value
+ });
 
-  $("loginButton").disabled=false;
+ $("loginButton").disabled=false;
 
-  if(error){
-    $("loginError").textContent=error.message;
-    return;
-  }
+ if(error){
+  $("loginError").textContent=error.message;
+  return;
+ }
 
-  $("loginError").textContent="";
-  showDashboard();
-  await loadAnalytics();
+ const {data}=await db.auth.getUser();
+ if(!data.user||data.user.id!==ADMIN_USER_ID){
+  await db.auth.signOut();
+  $("loginError").textContent="Unauthorized account.";
+  return;
+ }
+
+ $("loginError").textContent="";
+ showDashboard();
+ await loadAnalytics();
 });
 
 $("logout").addEventListener("click",async()=>{
-  await db.auth.signOut();
-  showLogin();
+ await db.auth.signOut();
+ showLogin();
 });
 
 $("refresh").addEventListener("click",loadAnalytics);
 
-db.auth.onAuthStateChange((event,session)=>{
-  if(session && event==="SIGNED_IN"){
-    showDashboard();
-  }
+$("filters").addEventListener("click",async e=>{
+ const button=e.target.closest("button[data-days]");
+ if(!button)return;
+ selectedDays=button.dataset.days;
+ document.querySelectorAll("#filters button").forEach(b=>{
+  b.classList.toggle("active",b===button);
+ });
+ await loadAnalytics();
+});
+
+window.addEventListener("resize",()=>{
+ if(!$("dashboard").classList.contains("hidden"))loadAnalytics();
 });
 
 (async()=>{
-  const {data}=await db.auth.getSession();
-  if(data.session){
-    showDashboard();
-    await loadAnalytics();
+ const {data}=await db.auth.getSession();
+ if(data.session){
+  const {data:userData}=await db.auth.getUser();
+  if(userData.user&&userData.user.id===ADMIN_USER_ID){
+   showDashboard();
+   await loadAnalytics();
   }else{
-    showLogin();
+   await db.auth.signOut();
+   showLogin();
   }
+ }else{
+  showLogin();
+ }
 })();
 </script>
 </body>
