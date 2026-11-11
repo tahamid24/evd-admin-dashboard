@@ -482,6 +482,46 @@ $("logout").addEventListener("click",async()=>{
 });
 
 $("refresh").addEventListener("click",loadAnalytics);
+ 
+$("sendNotification").addEventListener("click", async () => {
+ const button = $("sendNotification");
+ const title = $("notificationTitle").value.trim();
+ const body = $("notificationBody").value.trim();
+ const status = $("notificationStatus");
+
+ if (!title || !body) {
+  status.textContent = "Enter both a title and a message.";
+  return;
+ }
+
+ if (!confirm("Send this notification to all registered devices?")) {
+  return;
+ }
+
+ button.disabled = true;
+ status.textContent = "Sending notification...";
+
+ try {
+  const { data, error } = await db.functions.invoke(
+   "send-notification",
+   { body: { title, body } }
+  );
+
+  if (error) throw error;
+
+  status.textContent =
+   `Notification sent! Successful: ${data.sent}, Failed: ${data.failed}`;
+
+  $("notificationTitle").value = "";
+  $("notificationBody").value = "";
+
+ } catch (error) {
+  status.textContent = "Failed: " + error.message;
+ } finally {
+  button.disabled = false;
+ }
+});
+
 
 $("filters").addEventListener("click",async e=>{
  const button=e.target.closest("button[data-days]");
