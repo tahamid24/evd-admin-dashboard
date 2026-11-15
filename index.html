@@ -1,560 +1,535 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#090909">
-<title>EVD — Analytics</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-:root{color-scheme:dark;--bg:#090909;--panel:#141414;--line:#292929;--muted:#929292;--white:#f5f5f5}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--white);font-family:Arial,sans-serif}
-button,input{font:inherit}
-button{cursor:pointer}
-.hidden{display:none!important}
-.muted{color:var(--muted)}
-.small{font-size:12px}
-.login{min-height:100vh;display:grid;place-items:center;padding:20px}
-.login-card{width:100%;max-width:390px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px}
-.logo{font-size:26px;font-weight:900;letter-spacing:-1px}
-input{width:100%;padding:13px;margin:9px 0 15px;background:#090909;color:white;border:1px solid #333;border-radius:9px}
-button{padding:11px 15px;border:1px solid #333;border-radius:9px;background:#202020;color:white;font-weight:700}
-button.primary{background:white;color:black;border-color:white}
-button:disabled{opacity:.5}
-.error{color:#ff7777;font-size:13px;min-height:18px}
-.app{max-width:1250px;margin:auto;padding:25px}
-header{display:flex;align-items:center;justify-content:space-between;gap:15px;padding-bottom:22px;border-bottom:1px solid var(--line)}
-h1{font-size:23px;margin:0 0 5px}
-h2{font-size:15px;margin:0 0 17px}
-.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:23px 0}
-.filters{display:flex;gap:7px;flex-wrap:wrap}
-.filters button{font-size:12px;padding:9px 12px}
-.filters button.active{background:white;color:black;border-color:white}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:15px}
-.card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px;min-width:0}
-.stat{font-size:30px;font-weight:800;margin-top:12px;overflow-wrap:anywhere}
-.stat-label{font-size:11px;color:var(--muted);letter-spacing:.5px}
-.panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.chart{width:100%;height:230px;display:block}
-.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}
-.row:last-child{border:0}
-.value{color:#aaa;text-align:right;overflow-wrap:anywhere}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
-th,td{text-align:left;padding:12px 9px;border-bottom:1px solid var(--line)}
-th{color:var(--muted);font-size:10px;letter-spacing:.5px}
-.status{margin:15px 0;color:var(--muted);font-size:12px}
-.tag{display:inline-block;border:1px solid #333;border-radius:20px;padding:4px 8px;font-size:11px}
-.success{color:#8de0a7}
-.failed{color:#ff8c8c}
-.empty{color:var(--muted);font-size:13px;padding:12px 0}
-footer{text-align:center;padding:30px 0;color:var(--muted);font-size:11px}
-@media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.panels{grid-template-columns:1fr}.app{padding:16px}}
-@media(max-width:380px){.grid{grid-template-columns:1fr}}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EVD Admin Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg:#080808; --panel:#111; --panel2:#171717; --border:#292929;
+      --text:#f4f4f4; --muted:#929292; --accent:#fff; --green:#55d68b;
+      --red:#ff6868; --yellow:#e9c46a; --radius:15px;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,Arial,sans-serif; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; }
+    .hidden { display:none !important; }
+    .wrap { width:min(1440px, calc(100% - 32px)); margin:0 auto; padding:28px 0 50px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:24px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo { width:42px;height:42px;border:1px solid #555;border-radius:12px;display:grid;place-items:center;font-weight:900;letter-spacing:-1px; }
+    h1 { font-size:21px; margin:0; letter-spacing:.3px; }
+    .sub { color:var(--muted); font-size:12px; margin-top:5px; }
+    .actions { display:flex; gap:9px; flex-wrap:wrap; }
+    .btn { background:#f1f1f1;color:#080808;border:0;border-radius:9px;padding:10px 14px;font-weight:700;font-size:12px; }
+    .btn.secondary { background:#1a1a1a;color:#eee;border:1px solid var(--border); }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:18px; }
+    .toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
+    .tabs,.filters { display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+    .chip { border:1px solid var(--border); background:#141414; color:#bbb; padding:8px 12px; border-radius:8px; font-size:12px; }
+    .chip.active { color:#080808; background:#f2f2f2; border-color:#f2f2f2; font-weight:700; }
+    input,select { background:#0b0b0b; border:1px solid var(--border); color:#eee; border-radius:8px; padding:9px 10px; outline:none; min-width:0; }
+    input:focus,select:focus { border-color:#777; }
+    .date-input { width:145px; font-size:12px; }
+    .grid { display:grid; gap:13px; }
+    .kpis { grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:14px; }
+    .kpi { min-height:112px; }
+    .kpi-label { color:var(--muted); font-size:11px; letter-spacing:.8px; text-transform:uppercase; }
+    .kpi-value { font-size:29px; font-weight:800; margin-top:14px; letter-spacing:-.8px; }
+    .kpi-note { color:var(--muted); font-size:11px; margin-top:5px; }
+    .two { grid-template-columns:1.7fr 1fr; margin-bottom:14px; }
+    .three { grid-template-columns:repeat(3,minmax(0,1fr)); margin-bottom:14px; }
+    .section-title { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:0 0 16px; font-size:14px; }
+    .section-title small { color:var(--muted); font-size:11px; font-weight:400; }
+    canvas { width:100%; height:250px; display:block; }
+    #resultChart { height:220px; }
+    .legend { display:flex; gap:14px; flex-wrap:wrap; color:var(--muted); font-size:11px; margin-top:10px; }
+    .dot { display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:#eee; }
+    .list { display:flex; flex-direction:column; gap:12px; }
+    .list-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; font-size:12px; }
+    .list-name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd; }
+    .list-count { color:var(--muted);font-variant-numeric:tabular-nums; }
+    .bar { height:5px;background:#242424;border-radius:10px;overflow:hidden;margin-top:6px; }
+    .bar > span { display:block;height:100%;background:#e8e8e8;border-radius:10px; }
+    .table-panel { margin-top:14px; }
+    .table-tools { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:13px; }
+    .table-tools input { flex:1; min-width:180px; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; min-width:650px; }
+    th,td { text-align:left; padding:12px 10px; border-bottom:1px solid #242424; font-size:12px; white-space:nowrap; }
+    th { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.7px; font-weight:600; }
+    td { color:#ddd; }
+    .status { display:inline-block;padding:4px 8px;border-radius:20px;font-size:10px;text-transform:capitalize;background:#222;color:#ccc; }
+    .status.success { color:var(--green);background:#10251a; }
+    .status.failed { color:var(--red);background:#2a1414; }
+    .status.other { color:var(--yellow); }
+    .pagination { display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;color:var(--muted);font-size:11px; }
+    .notice { padding:11px 13px;border:1px solid var(--border);border-radius:9px;color:var(--muted);font-size:12px;margin-bottom:14px; }
+    .error { color:var(--red); }
+    .login { min-height:100vh;display:grid;place-items:center;padding:20px; }
+    .login-card { width:min(390px,100%); }
+    .login-card h2 { margin:0 0 8px;font-size:20px; }
+    .login-card p { color:var(--muted);font-size:12px;line-height:1.5;margin:0 0 20px; }
+    .login-card input { width:100%;margin-bottom:10px;padding:12px; }
+    .login-card button { width:100%;margin-top:5px; }
+    #loginError { min-height:17px;color:var(--red);font-size:11px;margin-top:10px; }
+    #loading { color:var(--muted);font-size:12px; }
+    .empty { color:var(--muted);font-size:12px;text-align:center;padding:22px 0; }
+    .notification-grid { display:grid;grid-template-columns:1fr 2fr auto;gap:9px; }
+    .notification-grid input { width:100%; }
+    .foot { color:#666;font-size:10px;text-align:center;margin-top:25px; }
+    @media(max-width:900px) { .kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.two{grid-template-columns:1fr}.three{grid-template-columns:repeat(2,minmax(0,1fr));} }
+    @media(max-width:560px) { .wrap{width:calc(100% - 22px);padding-top:18px}header{align-items:flex-start}.brand{gap:9px}.logo{width:38px;height:38px}h1{font-size:17px}.actions .btn{padding:9px 10px}.kpis{gap:8px}.kpi{padding:13px;min-height:98px}.kpi-value{font-size:24px}.three{grid-template-columns:1fr}.panel{padding:14px}.notification-grid{grid-template-columns:1fr}.date-input{width:125px} }
+  </style>
 </head>
 <body>
+  <section id="loginView" class="login">
+    <div class="panel login-card">
+      <div class="brand" style="margin-bottom:22px"><div class="logo">EVD</div><div><h1>EVD ADMIN</h1><div class="sub">Private analytics dashboard</div></div></div>
+      <h2>Admin sign in</h2>
+      <p>Sign in with the authorized dashboard account.</p>
+      <input id="email" type="email" placeholder="Admin email" autocomplete="username" />
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+      <button id="loginBtn" class="btn" onclick="signIn()">Sign in</button>
+      <div id="loginError"></div>
+    </div>
+  </section>
 
-<section id="login" class="login">
- <div class="login-card">
-  <div class="logo">EVD<span class="muted">.</span></div>
-  <p class="muted small">PRIVATE ADMIN ANALYTICS</p>
-  <h2 style="margin-top:30px">Welcome back</h2>
-  <form id="loginForm">
-   <label class="muted small">Admin email</label>
-   <input id="email" type="email" placeholder="Your Gmail address" required>
-   <label class="muted small">Password</label>
-   <input id="password" type="password" placeholder="Supabase password" required>
-   <button class="primary" id="loginButton" style="width:100%">Sign in</button>
-  </form>
-  <p id="loginError" class="error"></p>
-  <p class="muted small">Authorized administrators only.</p>
- </div>
-</section>
+  <main id="appView" class="wrap hidden">
+    <header>
+      <div class="brand">
+        <div class="logo">EVD</div>
+        <div><h1>EDGE VIDEO DOWNLOADER</h1><div class="sub">ADMIN ANALYTICS · <span id="lastUpdated">Not loaded</span></div></div>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" id="refreshBtn" onclick="loadAnalytics()">↻ Refresh</button>
+        <button class="btn secondary" onclick="signOut()">Sign out</button>
+      </div>
+    </header>
 
-<section id="dashboard" class="app hidden">
- <header>
-  <div>
-   <div class="logo">EVD<span class="muted">.</span></div>
-   <div class="muted small">Analytics / Overview</div>
-  </div>
-  <button id="logout">Sign out</button>
- </header>
+    <div id="notice" class="notice hidden"></div>
+    <div class="toolbar">
+      <div class="tabs" id="rangeTabs">
+        <button class="chip" data-range="7">7 days</button>
+        <button class="chip active" data-range="30">30 days</button>
+        <button class="chip" data-range="90">90 days</button>
+        <button class="chip" data-range="all">All time</button>
+      </div>
+      <div class="filters">
+        <input class="date-input" type="date" id="fromDate" aria-label="From date">
+        <span class="sub">to</span>
+        <input class="date-input" type="date" id="toDate" aria-label="To date">
+        <button class="chip" onclick="applyCustomRange()">Apply</button>
+        <button class="chip" onclick="clearCustomRange()">Clear</button>
+      </div>
+    </div>
 
- <div class="toolbar">
-  <div>
-   <h1>Overview</h1>
-   <div class="muted small">Your EVD app performance</div>
-  </div>
-  <div class="filters" id="filters">
-   <button data-days="7" class="active">7 days</button>
-   <button data-days="30">30 days</button>
-   <button data-days="90">90 days</button>
-   <button data-days="all">All time</button>
-  </div>
- </div>
+    <div id="loading">Loading analytics…</div>
+    <section id="dashboardContent" class="hidden">
+      <div class="grid kpis">
+        <div class="panel kpi"><div class="kpi-label">Total devices</div><div class="kpi-value" id="totalDevices">—</div><div class="kpi-note">All registered devices</div></div>
+        <div class="panel kpi"><div class="kpi-label">Active devices</div><div class="kpi-value" id="activeDevices">—</div><div class="kpi-note">Seen in selected period</div></div>
+        <div class="panel kpi"><div class="kpi-label">Downloads</div><div class="kpi-value" id="totalDownloads">—</div><div class="kpi-note">Selected period</div></div>
+        <div class="panel kpi"><div class="kpi-label">Active users</div><div class="kpi-value" id="activeUsers">—</div><div class="kpi-note">Unique app_open users</div></div>
+        <div class="panel kpi"><div class="kpi-label">Successful</div><div class="kpi-value" id="successful">—</div><div class="kpi-note">Successful download events</div></div>
+        <div class="panel kpi"><div class="kpi-label">Failed</div><div class="kpi-value" id="failed">—</div><div class="kpi-note">Failed download events</div></div>
+        <div class="panel kpi"><div class="kpi-label">Success rate</div><div class="kpi-value" id="successRate">—</div><div class="kpi-note">Success ÷ (success + failed)</div></div>
+        <div class="panel kpi"><div class="kpi-label">Countries</div><div class="kpi-value" id="countries">—</div><div class="kpi-note">Distinct device countries</div></div>
+      </div>
 
- <div id="status" class="status">Loading analytics...</div>
+      <div class="grid two">
+        <div class="panel">
+          <h3 class="section-title">Download activity <small id="activityCaption">By day</small></h3>
+          <canvas id="activityChart"></canvas>
+          <div class="legend"><span><i class="dot"></i>Download events</span></div>
+        </div>
+        <div class="panel">
+          <h3 class="section-title">Download outcomes</h3>
+          <canvas id="resultChart"></canvas>
+          <div class="legend"><span><i class="dot" style="background:var(--green)"></i>Success</span><span><i class="dot" style="background:var(--red)"></i>Failed</span><span><i class="dot" style="background:#555"></i>Other</span></div>
+        </div>
+      </div>
 
- <div class="grid">
-  <div class="card"><div class="stat-label">TOTAL DEVICES</div><div class="stat" id="devices">—</div><div class="muted small">All registered devices</div></div>
-  <div class="card"><div class="stat-label">ACTIVE DEVICES</div><div class="stat" id="activeDevices">—</div><div class="muted small">Seen during selected period</div></div>
-  <div class="card"><div class="stat-label">TOTAL DOWNLOADS</div><div class="stat" id="downloads">—</div><div class="muted small">Selected period</div></div>
-  <div class="card"><div class="stat-label">ACTIVE USERS</div><div class="stat" id="activeUsers">—</div><div class="muted small">Unique app-open users</div></div>
-  <div class="card"><div class="stat-label">SUCCESSFUL DOWNLOADS</div><div class="stat success" id="successful">—</div></div>
-  <div class="card"><div class="stat-label">FAILED DOWNLOADS</div><div class="stat failed" id="failed">—</div></div>
-  <div class="card"><div class="stat-label">SUCCESS RATE</div><div class="stat" id="successRate">—</div></div>
-  <div class="card"><div class="stat-label">COUNTRIES</div><div class="stat" id="countryCount">—</div></div>
- </div>
+      <div class="grid three">
+        <div class="panel"><h3 class="section-title">Top countries</h3><div id="countryList" class="list"></div></div>
+        <div class="panel"><h3 class="section-title">Device models</h3><div id="modelList" class="list"></div></div>
+        <div class="panel"><h3 class="section-title">Android versions</h3><div id="androidList" class="list"></div></div>
+        <div class="panel"><h3 class="section-title">App versions</h3><div id="appVersionList" class="list"></div></div>
+        <div class="panel"><h3 class="section-title">Platforms / sources</h3><div id="platformList" class="list"></div></div>
+        <div class="panel"><h3 class="section-title">File formats</h3><div id="formatList" class="list"></div></div>
+        <div class="panel"><h3 class="section-title">Manufacturers</h3><div id="manufacturerList" class="list"></div></div>
+        <div class="panel"><h3 class="section-title">App events</h3><div id="eventList" class="list"></div></div>
+        <div class="panel"><h3 class="section-title">Daily summary</h3><div id="summaryList" class="list"></div></div>
+      </div>
 
- <div class="panels">
-  <div class="panel">
-   <h2>Download activity</h2>
-   <canvas id="activityChart" class="chart"></canvas>
-  </div>
-  <div class="panel">
-   <h2>Download results</h2>
-   <canvas id="resultChart" class="chart"></canvas>
-  </div>
-  <div class="panel"><h2>Top countries</h2><div id="countries"></div></div>
-  <div class="panel"><h2>Device models</h2><div id="models"></div></div>
-  <div class="panel"><h2>Android versions</h2><div id="android"></div></div>
-  <div class="panel"><h2>App versions</h2><div id="appVersions"></div></div>
-  <div class="panel"><h2>Popular platforms</h2><div id="platforms"></div></div>
-  <div class="panel"><h2>Popular formats</h2><div id="formats"></div></div>
-  <div class="panel"><h2>App events</h2><div id="events"></div></div>
-  <div class="panel"><h2>Device manufacturers</h2><div id="manufacturers"></div></div>
- </div>
+      <div class="panel" style="margin-top:14px">
+        <h3 class="section-title">Send announcement <small>Uses your existing send-notification Edge Function</small></h3>
+        <div class="notification-grid">
+          <input id="notificationTitle" maxlength="80" placeholder="Notification title">
+          <input id="notificationBody" maxlength="300" placeholder="Message">
+          <button class="btn" onclick="sendNotification()">Send</button>
+        </div>
+        <div id="notificationStatus" class="sub" style="margin-top:9px"></div>
+      </div>
 
- <div class="panel" style="margin-top:15px">
-  <h2>Send notification</h2>
-  <label class="muted small">Notification title</label>
-  <input id="notificationTitle" type="text" maxlength="100" placeholder="EVD Update">
-  <label class="muted small">Message</label>
-  <textarea id="notificationBody" maxlength="500" placeholder="Write your notification..." style="width:100%;min-height:110px;padding:13px;margin:9px 0 15px;background:#090909;color:white;border:1px solid #333;border-radius:9px;font:inherit;resize:vertical"></textarea>
-  <button class="primary" id="sendNotification">Send to all devices</button>
-  <p id="notificationStatus" class="status"></p>
- </div>
-
- <div class="panel" style="margin-top:15px">
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-   <h2 style="margin:0">Recent downloads</h2>
-   <span class="muted small" id="recentCount"></span>
-  </div>
-  <div class="table-wrap" style="margin-top:15px">
-   <table>
-    <thead><tr><th>PLATFORM</th><th>FORMAT</th><th>STATUS</th><th>DATE</th></tr></thead>
-    <tbody id="recent"></tbody>
-   </table>
-  </div>
- </div>
-
- <div class="toolbar">
-  <span class="muted small" id="lastUpdated">Not updated yet</span>
-  <button class="primary" id="refresh">Refresh analytics</button>
- </div>
- <footer>EDGE VIDEO DOWNLOADER · PRIVATE ADMIN DASHBOARD</footer>
-</section>
+      <div class="panel table-panel">
+        <h3 class="section-title">Recent downloads <small id="downloadCountLabel">0 records</small></h3>
+        <div class="table-tools">
+          <input id="downloadSearch" placeholder="Search platform, format or status…" oninput="renderDownloads()">
+          <select id="platformFilter" onchange="renderDownloads()"><option value="">All platforms</option></select>
+          <select id="statusFilter" onchange="renderDownloads()"><option value="">All statuses</option><option value="success">Success</option><option value="failed">Failed</option><option value="other">Other</option></select>
+          <button class="btn secondary" onclick="exportCSV()">Export CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Platform / source</th><th>Format</th><th>Status</th><th>Date</th></tr></thead><tbody id="downloadRows"></tbody></table>
+        </div>
+        <div class="pagination"><span id="pageInfo">Page 1</span><div class="actions"><button class="chip" onclick="changePage(-1)">Previous</button><button class="chip" onclick="changePage(1)">Next</button></div></div>
+      </div>
+    </section>
+    <div class="foot">EDGE VIDEO DOWNLOADER · PRIVATE ADMIN DASHBOARD</div>
+  </main>
 
 <script>
-const SUPABASE_URL = "https://zphnhmzgdvcdqefjvafr.supabase.co";
-const SUPABASE_KEY = "sb_publishable_EqgJ9N2iTFpkYUg_0m9FZA_tNPv7kIu";
-const ADMIN_USER_ID = "dde6584a-93e4-4982-bca3-3f4f02603482";
+  // Keep your existing Supabase project URL and publishable/anon key here.
+  const SUPABASE_URL = "https://zphnhmzgdvcdqefjvafr.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_EqgJ9N2iTFpkYUg_0m9FZA_tNPv7kIu";
+  const ADMIN_USER_ID = "dde6584a-93e4-4982-bca3-3f4f02603482";
 
-const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const $ = id => document.getElementById(id);
-let selectedDays = "7";
-let busy = false;
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let selectedRange = "30";
+  let customStart = null, customEnd = null;
+  let devices = [], downloads = [], events = [];
+  let currentPage = 1;
+  const PAGE_SIZE = 20;
 
-function showLogin(){
- $("dashboard").classList.add("hidden");
- $("login").classList.remove("hidden");
-}
-function showDashboard(){
- $("login").classList.add("hidden");
- $("dashboard").classList.remove("hidden");
-}
-function setStatus(message){$("status").textContent=message;}
+  const $ = id => document.getElementById(id);
+  const safe = value => value == null || value === "" ? "Unknown" : String(value);
+  const dateLabel = value => {
+    if (!value) return "—";
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+  };
+  const isSuccess = s => String(s || "").toLowerCase() === "success";
+  const isFailed = s => String(s || "").toLowerCase() === "failed";
+  const outcome = s => isSuccess(s) ? "success" : isFailed(s) ? "failed" : "other";
 
-function startDate(){
- if(selectedDays==="all")return null;
- const d=new Date();
- d.setDate(d.getDate()-Number(selectedDays)+1);
- d.setHours(0,0,0,0);
- return d.toISOString();
-}
-
-async function getAllRows(table,columns,dateColumn){
- const rows=[];
- const pageSize=1000;
- let from=0;
- while(true){
-  let query=db.from(table).select(columns).order(dateColumn,{ascending:false});
-  const start=startDate();
-  if(start)query=query.gte(dateColumn,start);
-  const {data,error}=await query.range(from,from+pageSize-1);
-  if(error)throw error;
-  const batch=data||[];
-  rows.push(...batch);
-  if(batch.length<pageSize)break;
-  from+=pageSize;
- }
- return rows;
-}
-
-async function getAllDevices(){
- const rows=[];
- const pageSize=1000;
- let from=0;
- while(true){
-  const {data,error}=await db.from("devices")
-   .select("manufacturer,model,android_version,app_version,country,first_seen,last_seen")
-   .order("last_seen",{ascending:false})
-   .range(from,from+pageSize-1);
-  if(error)throw error;
-  const batch=data||[];
-  rows.push(...batch);
-  if(batch.length<pageSize)break;
-  from+=pageSize;
- }
- return rows;
-}
-
-function countBy(items,key){
- const counts={};
- items.forEach(item=>{
-  const name=item[key]||"Unknown";
-  counts[name]=(counts[name]||0)+1;
- });
- return Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-}
-
-function renderList(id,items){
- const el=$(id);
- el.replaceChildren();
- if(!items.length){
-  const p=document.createElement("p");
-  p.className="empty";
-  p.textContent="No data available";
-  el.appendChild(p);
-  return;
- }
- items.slice(0,10).forEach(([name,count])=>{
-  const row=document.createElement("div");
-  row.className="row";
-  const a=document.createElement("span");
-  const b=document.createElement("span");
-  a.textContent=name;
-  b.textContent=count;
-  b.className="value";
-  row.append(a,b);
-  el.appendChild(row);
- });
-}
-
-function drawActivity(canvasId,downloads){
- const canvas=$(canvasId);
- const rect=canvas.getBoundingClientRect();
- const width=Math.max(280,rect.width);
- const height=230;
- const ratio=window.devicePixelRatio||1;
- canvas.width=width*ratio;
- canvas.height=height*ratio;
- const ctx=canvas.getContext("2d");
- ctx.scale(ratio,ratio);
- ctx.clearRect(0,0,width,height);
-
- const days=selectedDays==="all"?30:Number(selectedDays);
- const count=Math.min(days,30);
- const labels=[];
- const values={};
- for(let i=count-1;i>=0;i--){
-  const d=new Date();
-  d.setDate(d.getDate()-i);
-  const key=d.toLocaleDateString();
-  labels.push({key,label:(d.getMonth()+1)+"/"+d.getDate()});
-  values[key]=0;
- }
- downloads.forEach(item=>{
-  if(!item.created_at)return;
-  const key=new Date(item.created_at).toLocaleDateString();
-  if(key in values)values[key]++;
- });
-
- const max=Math.max(1,...Object.values(values));
- const left=27,right=8,top=12,bottom=30;
- const chartW=width-left-right;
- const chartH=height-top-bottom;
- ctx.font="10px Arial";
- ctx.fillStyle="#888";
- ctx.strokeStyle="#292929";
- ctx.lineWidth=1;
-
- for(let i=0;i<=4;i++){
-  const y=top+chartH*i/4;
-  ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(width-right,y);ctx.stroke();
-  ctx.fillText(String(Math.round(max*(4-i)/4)),2,y+3);
- }
-
- const gap=4;
- const barW=Math.max(2,(chartW-gap*(count-1))/count);
- labels.forEach((item,i)=>{
-  const value=values[item.key];
-  const barH=value/max*(chartH-5);
-  const x=left+i*(barW+gap);
-  ctx.fillStyle="#f1f1f1";
-  ctx.fillRect(x,top+chartH-barH,barW,barH);
-  if(count<=14||i%Math.ceil(count/7)===0||i===count-1){
-   ctx.fillStyle="#888";
-   ctx.fillText(item.label,x,height-9);
+  function showNotice(message, isError=false) {
+    const el = $("notice");
+    el.textContent = message;
+    el.classList.remove("hidden");
+    el.classList.toggle("error", isError);
   }
- });
-}
+  function hideNotice() { $("notice").classList.add("hidden"); }
 
-function drawResults(downloads){
- const canvas=$("resultChart");
- const width=Math.max(280,canvas.getBoundingClientRect().width);
- const height=230;
- const ratio=window.devicePixelRatio||1;
- canvas.width=width*ratio;
- canvas.height=height*ratio;
- const ctx=canvas.getContext("2d");
- ctx.scale(ratio,ratio);
- ctx.clearRect(0,0,width,height);
-
- const success=downloads.filter(x=>x.status==="success").length;
- const failed=downloads.filter(x=>x.status==="failed").length;
- const total=success+failed;
- const cx=width/2,cy=95,r=66,thickness=19;
-
- ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
- ctx.strokeStyle="#303030";ctx.lineWidth=thickness;ctx.stroke();
-
- if(total){
-  const angle=success/total*Math.PI*2;
-  ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+angle);
-  ctx.strokeStyle="#f5f5f5";ctx.lineWidth=thickness;ctx.stroke();
-
-  ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2+angle,Math.PI*1.5);
-  ctx.strokeStyle="#777";ctx.lineWidth=thickness;ctx.stroke();
- }
-
- ctx.textAlign="center";
- ctx.fillStyle="#fff";ctx.font="bold 25px Arial";
- ctx.fillText(total?Math.round(success/total*100)+"%":"—",cx,cy+8);
- ctx.font="11px Arial";ctx.fillStyle="#999";
- ctx.fillText("SUCCESS RATE",cx,cy+25);
- ctx.textAlign="left";
- ctx.fillStyle="#f5f5f5";
- ctx.fillRect(cx-88,190,9,9);
- ctx.fillStyle="#aaa";ctx.fillText("Success: "+success,cx-74,199);
- ctx.fillStyle="#777";
- ctx.fillRect(cx+12,190,9,9);
- ctx.fillStyle="#aaa";ctx.fillText("Failed: "+failed,cx+26,199);
-}
-
-async function loadAnalytics(){
- if(busy)return;
- busy=true;
- $("refresh").disabled=true;
- setStatus("Loading analytics...");
-
- try{
-  const {data:userData,error:userError}=await db.auth.getUser();
-  if(userError||!userData.user||userData.user.id!==ADMIN_USER_ID){
-   await db.auth.signOut();
-   showLogin();
-   $("loginError").textContent="This account is not authorized to access EVD Analytics.";
-   return;
-  }
-
-  const [devices,downloads,events]=await Promise.all([
-   getAllDevices(),
-   getAllRows("download_events","source_domain,status,format,created_at","created_at"),
-   getAllRows("app_events","event_name,created_at,user_id","created_at")
-  ]);
-
-  const start=startDate();
-  const activeDevices=start
-   ?devices.filter(d=>d.last_seen&&d.last_seen>=start).length
-   :devices.length;
-
-  const appOpens=events.filter(e=>e.event_name==="app_open");
-  const activeUsers=new Set(appOpens.map(e=>e.user_id).filter(Boolean)).size;
-
-  const success=downloads.filter(x=>x.status==="success").length;
-  const failed=downloads.filter(x=>x.status==="failed").length;
-  const rate=downloads.length?Math.round(success/downloads.length*100):0;
-
-  $("devices").textContent=devices.length;
-  $("activeDevices").textContent=activeDevices;
-  $("downloads").textContent=downloads.length;
-  $("activeUsers").textContent=activeUsers;
-  $("successful").textContent=success;
-  $("failed").textContent=failed;
-  $("successRate").textContent=rate+"%";
-  $("countryCount").textContent=new Set(devices.map(d=>d.country).filter(Boolean)).size;
-
-  renderList("countries",countBy(devices,"country"));
-  renderList("models",countBy(devices,"model"));
-  renderList("android",countBy(devices,"android_version"));
-  renderList("appVersions",countBy(devices,"app_version"));
-  renderList("manufacturers",countBy(devices,"manufacturer"));
-  renderList("platforms",countBy(downloads,"source_domain"));
-  renderList("formats",countBy(downloads,"format"));
-  renderList("events",countBy(events,"event_name"));
-
-  drawActivity("activityChart",downloads);
-  drawResults(downloads);
-
-  const recent=$("recent");
-  recent.replaceChildren();
-  $("recentCount").textContent=downloads.length+" records in selected period";
-
-  if(!downloads.length){
-   const tr=document.createElement("tr");
-   const td=document.createElement("td");
-   td.colSpan=4;td.textContent="No downloads in this period";
-   tr.appendChild(td);recent.appendChild(tr);
-  }else{
-   downloads.slice(0,20).forEach(item=>{
-    const tr=document.createElement("tr");
-    const values=[
-     item.source_domain||"Unknown",
-     item.format||"Unknown",
-     item.status||"Unknown",
-     item.created_at?new Date(item.created_at).toLocaleString():"—"
-    ];
-    values.forEach((value,index)=>{
-     const td=document.createElement("td");
-     td.textContent=value;
-     if(index===2)td.className=value==="success"?"success":"failed";
-     tr.appendChild(td);
+  async function signIn() {
+    $("loginError").textContent = "";
+    $("loginBtn").disabled = true;
+    const { error } = await sb.auth.signInWithPassword({
+      email: $("email").value.trim(), password: $("password").value
     });
-    recent.appendChild(tr);
-   });
+    $("loginBtn").disabled = false;
+    if (error) { $("loginError").textContent = error.message; return; }
+    await checkSession();
+  }
+  async function signOut() {
+    await sb.auth.signOut();
+    $("appView").classList.add("hidden");
+    $("loginView").classList.remove("hidden");
+  }
+  async function checkSession() {
+    const { data, error } = await sb.auth.getSession();
+    if (error || !data.session) return;
+    if (data.session.user.id !== ADMIN_USER_ID) {
+      await sb.auth.signOut();
+      $("loginError").textContent = "This account is not authorized.";
+      return;
+    }
+    $("loginView").classList.add("hidden");
+    $("appView").classList.remove("hidden");
+    await loadAnalytics();
+  }
+  sb.auth.onAuthStateChange((_event, session) => {
+    if (!session) {
+      $("appView").classList.add("hidden");
+      $("loginView").classList.remove("hidden");
+    }
+  });
+
+  function startDate() {
+    if (customStart) return new Date(customStart + "T00:00:00").toISOString();
+    if (selectedRange === "all") return null;
+    const d = new Date();
+    d.setDate(d.getDate() - Number(selectedRange) + 1);
+    d.setHours(0,0,0,0);
+    return d.toISOString();
+  }
+  function inSelectedPeriod(value) {
+    if (!value) return false;
+    const t = new Date(value).getTime();
+    if (!Number.isFinite(t)) return false;
+    const start = startDate() ? new Date(startDate()).getTime() : -Infinity;
+    const end = customEnd ? new Date(customEnd + "T23:59:59.999").getTime() : Infinity;
+    return t >= start && t <= end;
+  }
+  async function getAllRows(table, columns, dateColumn=null) {
+    const all = [];
+    const batch = 1000;
+    for (let from=0; ; from+=batch) {
+      let query = sb.from(table).select(columns).range(from, from+batch-1);
+      const start = dateColumn ? startDate() : null;
+      if (start) query = query.gte(dateColumn, start);
+      if (dateColumn && customEnd) query = query.lte(dateColumn, customEnd + "T23:59:59.999");
+      const { data, error } = await query;
+      if (error) throw new Error(table + ": " + error.message);
+      all.push(...(data || []));
+      if (!data || data.length < batch) break;
+    }
+    return all;
+  }
+  async function getAllDevices() {
+    const all = [];
+    const batch = 1000;
+    for (let from=0; ; from+=batch) {
+      const { data, error } = await sb.from("devices")
+        .select("manufacturer,model,android_version,app_version,country,first_seen,last_seen")
+        .range(from, from+batch-1);
+      if (error) throw new Error("devices: " + error.message);
+      all.push(...(data || []));
+      if (!data || data.length < batch) break;
+    }
+    return all;
+  }
+  async function loadAnalytics() {
+    $("loading").classList.remove("hidden");
+    $("dashboardContent").classList.add("hidden");
+    $("refreshBtn").disabled = true;
+    hideNotice();
+    try {
+      const [d, dl, ev] = await Promise.all([
+        getAllDevices(),
+        getAllRows("download_events", "source_domain,status,format,created_at", "created_at"),
+        getAllRows("app_events", "event_name,created_at,user_id", "created_at")
+      ]);
+      devices = d;
+      downloads = dl.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+      events = ev;
+      renderDashboard();
+      $("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
+      $("dashboardContent").classList.remove("hidden");
+    } catch (e) {
+      showNotice("Could not load analytics: " + e.message, true);
+    } finally {
+      $("loading").classList.add("hidden");
+      $("refreshBtn").disabled = false;
+    }
   }
 
-  setStatus("Analytics loaded successfully.");
-  $("lastUpdated").textContent="Last refreshed: "+new Date().toLocaleString();
-
- }catch(error){
-  setStatus("Unable to load analytics: "+(error.message||"Unknown error"));
- }finally{
-  busy=false;
-  $("refresh").disabled=false;
- }
-}
-
-$("loginForm").addEventListener("submit",async e=>{
- e.preventDefault();
- $("loginButton").disabled=true;
- $("loginError").textContent="Signing in...";
-
- const {error}=await db.auth.signInWithPassword({
-  email:$("email").value.trim(),
-  password:$("password").value
- });
-
- $("loginButton").disabled=false;
-
- if(error){
-  $("loginError").textContent=error.message;
-  return;
- }
-
- const {data}=await db.auth.getUser();
- if(!data.user||data.user.id!==ADMIN_USER_ID){
-  await db.auth.signOut();
-  $("loginError").textContent="Unauthorized account.";
-  return;
- }
-
- $("loginError").textContent="";
- showDashboard();
- await loadAnalytics();
-});
-
-$("logout").addEventListener("click",async()=>{
- await db.auth.signOut();
- showLogin();
-});
-
-$("refresh").addEventListener("click",loadAnalytics);
- 
-$("sendNotification").addEventListener("click", async () => {
- const button = $("sendNotification");
- const title = $("notificationTitle").value.trim();
- const body = $("notificationBody").value.trim();
- const status = $("notificationStatus");
-
- if (!title || !body) {
-  status.textContent = "Enter both a title and a message.";
-  return;
- }
-
- if (!confirm("Send this notification to all registered devices?")) {
-  return;
- }
-
- button.disabled = true;
- status.textContent = "Sending notification...";
-
- try {
-  const { data, error } = await db.functions.invoke(
-   "send-notification",
-   { body: { title, body } }
-  );
-
-  if (error) {
- const details = await error.context?.json().catch(() => null);
- throw new Error(details?.error || details?.message || error.message);
-}
-
-  status.textContent =
-   `Notification sent! Successful: ${data.sent}, Failed: ${data.failed}`;
-
-  $("notificationTitle").value = "";
-  $("notificationBody").value = "";
-
- } catch (error) {
-  status.textContent = "Failed: " + error.message;
- } finally {
-  button.disabled = false;
- }
-});
-
-
-$("filters").addEventListener("click",async e=>{
- const button=e.target.closest("button[data-days]");
- if(!button)return;
- selectedDays=button.dataset.days;
- document.querySelectorAll("#filters button").forEach(b=>{
-  b.classList.toggle("active",b===button);
- });
- await loadAnalytics();
-});
-
-window.addEventListener("resize",()=>{
- if(!$("dashboard").classList.contains("hidden"))loadAnalytics();
-});
-
-(async()=>{
- const {data}=await db.auth.getSession();
- if(data.session){
-  const {data:userData}=await db.auth.getUser();
-  if(userData.user&&userData.user.id===ADMIN_USER_ID){
-   showDashboard();
-   await loadAnalytics();
-  }else{
-   await db.auth.signOut();
-   showLogin();
+  function countBy(rows, keyFn) {
+    const map = new Map();
+    rows.forEach(row => {
+      const key = safe(keyFn(row));
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return [...map.entries()].sort((a,b)=>b[1]-a[1]);
   }
- }else{
-  showLogin();
- }
-})();
+  function renderList(id, entries, limit=8) {
+    const el = $(id);
+    const items = entries.slice(0,limit);
+    if (!items.length) { el.innerHTML = '<div class="empty">No data for this period</div>'; return; }
+    const max = items[0][1] || 1;
+    el.innerHTML = items.map(([name,count]) => `
+      <div><div class="list-row"><span class="list-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span><span class="list-count">${count.toLocaleString()}</span></div>
+      <div class="bar"><span style="width:${Math.max(2,count/max*100)}%"></span></div></div>`).join("");
+  }
+  function escapeHtml(v) {
+    return String(v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function renderDashboard() {
+    const success = downloads.filter(x=>isSuccess(x.status)).length;
+    const failed = downloads.filter(x=>isFailed(x.status)).length;
+    const outcomes = success + failed;
+    const activeDevices = devices.filter(x=>inSelectedPeriod(x.last_seen)).length;
+    const activeUsers = new Set(events.filter(x=>String(x.event_name).toLowerCase()==="app_open" && x.user_id).map(x=>x.user_id)).size;
+    const countryCount = new Set(devices.map(x=>x.country).filter(Boolean)).size;
+    $("totalDevices").textContent = devices.length.toLocaleString();
+    $("activeDevices").textContent = activeDevices.toLocaleString();
+    $("totalDownloads").textContent = downloads.length.toLocaleString();
+    $("activeUsers").textContent = activeUsers.toLocaleString();
+    $("successful").textContent = success.toLocaleString();
+    $("failed").textContent = failed.toLocaleString();
+    $("successRate").textContent = outcomes ? Math.round(success/outcomes*100)+"%" : "—";
+    $("countries").textContent = countryCount.toLocaleString();
+
+    renderList("countryList", countBy(devices,x=>x.country));
+    renderList("modelList", countBy(devices,x=>x.model));
+    renderList("androidList", countBy(devices,x=>x.android_version));
+    renderList("appVersionList", countBy(devices,x=>x.app_version));
+    renderList("manufacturerList", countBy(devices,x=>x.manufacturer));
+    renderList("platformList", countBy(downloads,x=>x.source_domain));
+    renderList("formatList", countBy(downloads,x=>x.format));
+    renderList("eventList", countBy(events,x=>x.event_name));
+    renderDailySummary();
+    drawActivity();
+    drawResults(success,failed,downloads.length-success-failed);
+    populatePlatformFilter();
+    currentPage = 1;
+    renderDownloads();
+  }
+  function renderDailySummary() {
+    if (!downloads.length) { renderList("summaryList",[]); return; }
+    const days = countBy(downloads,x=>new Date(x.created_at).toLocaleDateString());
+    const peak = days[0];
+    const avg = downloads.length / Math.max(1, new Set(downloads.map(x=>new Date(x.created_at).toDateString())).size);
+    renderList("summaryList", [["Downloads / day",avg.toFixed(1)],["Peak day",peak[0]+" ("+peak[1]+")"],["Days with downloads",days.length]], 5);
+  }
+
+  function setupCanvas(canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1,Math.floor(rect.width*ratio));
+    canvas.height = Math.max(1,Math.floor(rect.height*ratio));
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(ratio,0,0,ratio,0,0);
+    return {ctx,w:rect.width,h:rect.height};
+  }
+  function drawActivity() {
+    const canvas = $("activityChart"), {ctx,w,h} = setupCanvas(canvas);
+    ctx.clearRect(0,0,w,h);
+    const grouped = new Map();
+    downloads.forEach(x=>{
+      const d = new Date(x.created_at);
+      if (!Number.isFinite(d.getTime())) return;
+      const key = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+      grouped.set(key,(grouped.get(key)||0)+1);
+    });
+    let keys = [...grouped.keys()].sort();
+    if (!keys.length) { ctx.fillStyle="#888";ctx.font="12px Arial";ctx.fillText("No download activity",12,25);return; }
+    const first = new Date(keys[0]+"T00:00:00"), last = new Date(keys[keys.length-1]+"T00:00:00");
+    const span = Math.max(1,Math.round((last-first)/86400000)+1);
+    const maxDays = Math.min(span, selectedRange==="all" && !customStart ? 365 : 180);
+    if (span > maxDays) {
+      const cutoff = new Date(last); cutoff.setDate(cutoff.getDate()-maxDays+1);
+      keys = keys.filter(k=>new Date(k+"T00:00:00")>=cutoff);
+    }
+    $("activityCaption").textContent = keys.length+" days with activity";
+    const vals = keys.map(k=>grouped.get(k)||0), max = Math.max(1,...vals);
+    const left=34,right=10,top=12,bottom=28, cw=w-left-right,ch=h-top-bottom;
+    ctx.strokeStyle="#303030";ctx.lineWidth=1;ctx.fillStyle="#888";ctx.font="10px Arial";
+    for(let i=0;i<=4;i++){const y=top+ch*i/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();ctx.fillText(String(Math.round(max*(1-i/4))),3,y+3);}
+    ctx.strokeStyle="#f0f0f0";ctx.lineWidth=2;ctx.beginPath();
+    vals.forEach((v,i)=>{const x=left+(keys.length===1?cw/2:i*cw/(keys.length-1));const y=top+ch-(v/max)*ch;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+    ctx.stroke();
+    ctx.fillStyle="#eee"; vals.forEach((v,i)=>{const x=left+(keys.length===1?cw/2:i*cw/(keys.length-1));const y=top+ch-(v/max)*ch;ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fill();});
+    ctx.fillStyle="#888";ctx.font="10px Arial";
+    const labelCount=Math.min(5,keys.length);
+    for(let i=0;i<labelCount;i++){const idx=Math.round(i*(keys.length-1)/Math.max(1,labelCount-1));const x=left+(keys.length===1?cw/2:idx*cw/(keys.length-1));ctx.fillText(keys[idx].slice(5),Math.max(left,x-14),h-8);}
+  }
+  function drawResults(success,failed,other) {
+    const canvas=$("resultChart"),{ctx,w,h}=setupCanvas(canvas);
+    ctx.clearRect(0,0,w,h);
+    const total=success+failed+other;
+    if(!total){ctx.fillStyle="#888";ctx.font="12px Arial";ctx.fillText("No download records",12,25);return;}
+    const cx=w/2,cy=h/2,r=Math.min(w,h)*.34,inner=r*.62;
+    const values=[success,failed,other],colors=["#55d68b","#ff6868","#555"];
+    let angle=-Math.PI/2;
+    values.forEach((v,i)=>{if(!v)return;const end=angle+v/total*Math.PI*2;ctx.beginPath();ctx.arc(cx,cy,r,angle,end);ctx.arc(cx,cy,inner,end,angle,true);ctx.closePath();ctx.fillStyle=colors[i];ctx.fill();angle=end;});
+    ctx.fillStyle="#f4f4f4";ctx.textAlign="center";ctx.font="bold 23px Arial";ctx.fillText(total.toLocaleString(),cx,cy+2);
+    ctx.fillStyle="#888";ctx.font="10px Arial";ctx.fillText("DOWNLOADS",cx,cy+18);ctx.textAlign="left";
+  }
+
+  function populatePlatformFilter() {
+    const select=$("platformFilter"), current=select.value;
+    const values=[...new Set(downloads.map(x=>safe(x.source_domain)))].sort();
+    select.innerHTML='<option value="">All platforms</option>'+values.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+    if(values.includes(current)) select.value=current;
+  }
+  function filteredDownloads() {
+    const q=$("downloadSearch").value.trim().toLowerCase();
+    const platform=$("platformFilter").value;
+    const status=$("statusFilter").value;
+    return downloads.filter(x=>{
+      const text=[x.source_domain,x.format,x.status].map(safe).join(" ").toLowerCase();
+      return (!q||text.includes(q))&&(!platform||safe(x.source_domain)===platform)&&(!status||outcome(x.status)===status);
+    });
+  }
+  function renderDownloads() {
+    const rows=filteredDownloads();
+    const totalPages=Math.max(1,Math.ceil(rows.length/PAGE_SIZE));
+    currentPage=Math.min(Math.max(1,currentPage),totalPages);
+    const page=rows.slice((currentPage-1)*PAGE_SIZE,currentPage*PAGE_SIZE);
+    $("downloadCountLabel").textContent=rows.length.toLocaleString()+" records";
+    $("pageInfo").textContent=`Page ${currentPage} of ${totalPages}`;
+    $("downloadRows").innerHTML=page.length?page.map(x=>{
+      const state=outcome(x.status);
+      return `<tr><td>${escapeHtml(safe(x.source_domain))}</td><td>${escapeHtml(safe(x.format))}</td><td><span class="status ${state}">${escapeHtml(safe(x.status))}</span></td><td>${escapeHtml(dateLabel(x.created_at))}</td></tr>`;
+    }).join(""):'<tr><td colspan="4" class="empty">No matching downloads</td></tr>';
+  }
+  function changePage(delta) { currentPage+=delta;renderDownloads(); }
+  function exportCSV() {
+    const rows=filteredDownloads();
+    const header=["Platform/source","Format","Status","Created at"];
+    const lines=[header,...rows.map(x=>[x.source_domain,x.format,x.status,x.created_at])];
+    const csv=lines.map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");
+    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download="evd-download-report.csv";a.click();URL.revokeObjectURL(url);
+  }
+
+  function applyCustomRange() {
+    const from=$("fromDate").value,to=$("toDate").value;
+    if(!from&&!to){showNotice("Choose a start date or end date.",true);return;}
+    if(from&&to&&from>to){showNotice("The start date must be before the end date.",true);return;}
+    customStart=from||null;customEnd=to||null;selectedRange="custom";
+    document.querySelectorAll("#rangeTabs .chip").forEach(b=>b.classList.remove("active"));
+    currentPage=1;loadAnalytics();
+  }
+  function clearCustomRange() {
+    customStart=null;customEnd=null;$("fromDate").value="";$("toDate").value="";
+    selectedRange="30";
+    document.querySelectorAll("#rangeTabs .chip").forEach(b=>b.classList.toggle("active",b.dataset.range==="30"));
+    loadAnalytics();
+  }
+  document.querySelectorAll("#rangeTabs .chip").forEach(btn=>btn.addEventListener("click",()=>{
+    selectedRange=btn.dataset.range;customStart=null;customEnd=null;
+    $("fromDate").value="";$("toDate").value="";
+    document.querySelectorAll("#rangeTabs .chip").forEach(b=>b.classList.toggle("active",b===btn));
+    loadAnalytics();
+  }));
+
+  async function sendNotification() {
+    const title=$("notificationTitle").value.trim(),body=$("notificationBody").value.trim();
+    const status=$("notificationStatus");
+    if(!title||!body){status.textContent="Enter both a title and a message.";return;}
+    status.textContent="Sending…";
+    try {
+      const {data,error}=await sb.functions.invoke("send-notification",{body:{title,body}});
+      if(error) {
+        let detail=error.message;
+        try { if(error.context && typeof error.context.json==="function"){const j=await error.context.json();detail=j.error||j.message||detail;} } catch(_){}
+        throw new Error(detail);
+      }
+      status.textContent=data?.message||"Notification request completed.";
+      $("notificationTitle").value="";$("notificationBody").value="";
+    } catch(e) { status.textContent="Failed: "+e.message; }
+  }
+
+  let resizeTimer;
+  window.addEventListener("resize",()=>{
+    clearTimeout(resizeTimer);
+    resizeTimer=setTimeout(()=>{
+      if(!$("dashboardContent").classList.contains("hidden")){
+        drawActivity();
+        const s=downloads.filter(x=>isSuccess(x.status)).length;
+        const f=downloads.filter(x=>isFailed(x.status)).length;
+        drawResults(s,f,downloads.length-s-f);
+      }
+    },150);
+  });
+  $("password").addEventListener("keydown",e=>{if(e.key==="Enter")signIn();});
+  checkSession();
 </script>
 </body>
 </html>
