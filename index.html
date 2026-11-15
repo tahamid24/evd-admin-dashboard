@@ -153,6 +153,17 @@
         </div>
       </div>
 
+      <div class="grid two" style="margin-bottom:14px">
+        <div class="panel">
+          <h3 class="section-title">Device growth <small>New registrations by day</small></h3>
+          <canvas id="growthChart"></canvas>
+        </div>
+        <div class="panel">
+          <h3 class="section-title">Platform download share</h3>
+          <canvas id="platformChart"></canvas>
+        </div>
+      </div>
+
       <div class="grid three">
         <div class="panel"><h3 class="section-title">Top countries</h3><div id="countryList" class="list"></div></div>
         <div class="panel"><h3 class="section-title">Device models</h3><div id="modelList" class="list"></div></div>
@@ -181,7 +192,8 @@
           <input id="downloadSearch" placeholder="Search platform, format or status…" oninput="renderDownloads()">
           <select id="platformFilter" onchange="renderDownloads()"><option value="">All platforms</option></select>
           <select id="statusFilter" onchange="renderDownloads()"><option value="">All statuses</option><option value="success">Success</option><option value="failed">Failed</option><option value="other">Other</option></select>
-          <button class="btn secondary" onclick="exportCSV()">Export CSV</button>
+          <button class="btn secondary" onclick="exportCSV()">Export downloads CSV</button>
+          <button class="btn secondary" onclick="exportSummaryReport()">Export analytics report</button>
         </div>
         <div class="table-wrap">
           <table><thead><tr><th>Platform / source</th><th>Format</th><th>Status</th><th>Date</th></tr></thead><tbody id="downloadRows"></tbody></table>
@@ -374,6 +386,8 @@
     renderDailySummary();
     drawActivity();
     drawResults(success,failed,downloads.length-success-failed);
+    drawDeviceGrowth();
+    drawPlatformBreakdown();
     populatePlatformFilter();
     currentPage = 1;
     renderDownloads();
@@ -440,6 +454,44 @@
     ctx.fillStyle="#888";ctx.font="10px Arial";ctx.fillText("DOWNLOADS",cx,cy+18);ctx.textAlign="left";
   }
 
+  function drawDeviceGrowth() {
+    const canvas=$("growthChart"),{ctx,w,h}=setupCanvas(canvas);
+    ctx.clearRect(0,0,w,h);
+    const grouped=new Map();
+    devices.forEach(device=>{
+      if(!device.first_seen || !inSelectedPeriod(device.first_seen)) return;
+      const d=new Date(device.first_seen);
+      if(!Number.isFinite(d.getTime())) return;
+      const key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+      grouped.set(key,(grouped.get(key)||0)+1);
+    });
+    const keys=[...grouped.keys()].sort();
+    if(!keys.length){ctx.fillStyle="#888";ctx.font="12px Arial";ctx.fillText("No new device registrations in this period",12,25);return;}
+    const vals=keys.map(k=>grouped.get(k)),max=Math.max(1,...vals);
+    const left=34,right=10,top=12,bottom=28,cw=w-left-right,ch=h-top-bottom;
+    ctx.strokeStyle="#303030";ctx.fillStyle="#888";ctx.font="10px Arial";
+    for(let i=0;i<=4;i++){const y=top+ch*i/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();ctx.fillText(String(Math.round(max*(1-i/4))),3,y+3);}
+    const step=cw/keys.length,bar=Math.max(2,Math.min(24,step*.62));
+    vals.forEach((v,i)=>{const x=left+i*step+(step-bar)/2,y=top+ch-v/max*ch;ctx.fillStyle="#e8e8e8";ctx.fillRect(x,y,bar,top+ch-y);});
+    ctx.fillStyle="#888";
+    [0,Math.floor((keys.length-1)/2),keys.length-1].filter((v,i,a)=>a.indexOf(v)===i).forEach(i=>ctx.fillText(keys[i].slice(5),left+i*step,h-8));
+  }
+  function drawPlatformBreakdown() {
+    const canvas=$("platformChart"),{ctx,w,h}=setupCanvas(canvas);
+    ctx.clearRect(0,0,w,h);
+    const entries=countBy(downloads,x=>x.source_domain).slice(0,6);
+    if(!entries.length){ctx.fillStyle="#888";ctx.font="12px Arial";ctx.fillText("No platform data in this period",12,25);return;}
+    const max=entries[0][1]||1,rowH=Math.min(34,(h-18)/entries.length);
+    entries.forEach(([name,count],i)=>{
+      const y=10+i*rowH;
+      ctx.fillStyle="#aaa";ctx.font="11px Arial";ctx.fillText(String(name).slice(0,22),8,y+11);
+      const barX=Math.min(125,w*.38),barW=Math.max(30,w-barX-45);
+      ctx.fillStyle="#252525";ctx.fillRect(barX,y,barW,9);
+      ctx.fillStyle="#eee";ctx.fillRect(barX,y,barW*count/max,9);
+      ctx.fillStyle="#999";ctx.textAlign="right";ctx.fillText(count.toLocaleString(),w-5,y+9);ctx.textAlign="left";
+    });
+  }
+
   function populatePlatformFilter() {
     const select=$("platformFilter"), current=select.value;
     const values=[...new Set(downloads.map(x=>safe(x.source_domain)))].sort();
@@ -476,6 +528,42 @@
     const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
     const url=URL.createObjectURL(blob),a=document.createElement("a");
     a.href=url;a.download="evd-download-report.csv";a.click();URL.revokeObjectURL(url);
+  }
+
+
+  function exportSummaryReport() {
+    const success=downloads.filter(x=>isSuccess(x.status)).length;
+    const failed=downloads.filter(x=>isFailed(x.status)).length;
+    const known=success+failed;
+    const period=customStart||customEnd
+      ? `${customStart||"Beginning"} to ${customEnd||"Today"}`
+      : selectedRange==="all" ? "All time" : `Last ${selectedRange} days`;
+    const rows=[
+      ["EVD Analytics Report"],
+      ["Generated",new Date().toLocaleString()],
+      ["Selected period",period],
+      ["Total registered devices",devices.length],
+      ["Active devices",devices.filter(x=>inSelectedPeriod(x.last_seen)).length],
+      ["Downloads",downloads.length],
+      ["Successful downloads",success],
+      ["Failed downloads",failed],
+      ["Other statuses",downloads.length-known],
+      ["Success rate",known?(success/known*100).toFixed(1)+"%":"N/A"],
+      ["Active users (app_open)",new Set(events.filter(x=>String(x.event_name).toLowerCase()==="app_open"&&x.user_id).map(x=>x.user_id)).size],
+      [],
+      ["Downloads by platform","Count"],
+      ...countBy(downloads,x=>x.source_domain),
+      [],
+      ["Downloads by format","Count"],
+      ...countBy(downloads,x=>x.format),
+      [],
+      ["App versions by device count","Count"],
+      ...countBy(devices,x=>x.app_version)
+    ];
+    const csv=rows.map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");
+    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download="evd-analytics-report.csv";a.click();URL.revokeObjectURL(url);
   }
 
   function applyCustomRange() {
@@ -522,6 +610,8 @@
     resizeTimer=setTimeout(()=>{
       if(!$("dashboardContent").classList.contains("hidden")){
         drawActivity();
+        drawDeviceGrowth();
+        drawPlatformBreakdown();
         const s=downloads.filter(x=>isSuccess(x.status)).length;
         const f=downloads.filter(x=>isFailed(x.status)).length;
         drawResults(s,f,downloads.length-s-f);
