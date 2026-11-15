@@ -83,6 +83,18 @@
     .foot { color:#666;font-size:10px;text-align:center;margin-top:25px; }
     @media(max-width:900px) { .kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.two{grid-template-columns:1fr}.three{grid-template-columns:repeat(2,minmax(0,1fr));} }
     @media(max-width:560px) { .wrap{width:calc(100% - 22px);padding-top:18px}header{align-items:flex-start}.brand{gap:9px}.logo{width:38px;height:38px}h1{font-size:17px}.actions .btn{padding:9px 10px}.kpis{gap:8px}.kpi{padding:13px;min-height:98px}.kpi-value{font-size:24px}.three{grid-template-columns:1fr}.panel{padding:14px}.notification-grid{grid-template-columns:1fr}.date-input{width:125px} }
+
+    .delta{font-weight:700;margin-left:4px}.delta.up{color:var(--green)}.delta.down{color:var(--red)}
+    .insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    .ins{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:#0c0c0c;font-size:12px;line-height:1.5;color:#ccc}
+    .ins>b{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:#222}
+    .ins.ok>b{background:#10251a;color:var(--green)}.ins.warn>b{background:#2a1f0c;color:var(--yellow)}
+    .ins span b{color:#fff}
+    #heatmap{display:grid;grid-template-columns:34px repeat(24,minmax(0,1fr));gap:3px;align-items:center}
+    .hc{aspect-ratio:1;border-radius:3px;min-height:10px}.hl{font-size:9px;color:var(--muted);text-align:center}
+    #tip{position:fixed;pointer-events:none;background:#1c1c1c;border:1px solid #444;border-radius:8px;padding:7px 9px;font-size:11px;line-height:1.5;z-index:9;display:none;white-space:nowrap}
+    th.sortable{cursor:pointer;user-select:none}
+    @media(max-width:900px){.insights{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -105,6 +117,7 @@
         <div><h1>EDGE VIDEO DOWNLOADER</h1><div class="sub">ADMIN ANALYTICS · <span id="lastUpdated">Not loaded</span></div></div>
       </div>
       <div class="actions">
+        <select id="autoRefresh" onchange="setAuto(this.value)" aria-label="Auto refresh"><option value="0">Auto-refresh: off</option><option value="30">Every 30s</option><option value="60">Every 1 min</option><option value="300">Every 5 min</option></select>
         <button class="btn secondary" id="refreshBtn" onclick="loadAnalytics()">↻ Refresh</button>
         <button class="btn secondary" onclick="signOut()">Sign out</button>
       </div>
@@ -113,6 +126,7 @@
     <div id="notice" class="notice hidden"></div>
     <div class="toolbar">
       <div class="tabs" id="rangeTabs">
+        <button class="chip" data-range="1">Today</button>
         <button class="chip" data-range="7">7 days</button>
         <button class="chip active" data-range="30">30 days</button>
         <button class="chip" data-range="90">90 days</button>
@@ -129,6 +143,7 @@
 
     <div id="loading">Loading analytics…</div>
     <section id="dashboardContent" class="hidden">
+      <div class="panel" style="margin-bottom:14px"><h3 class="section-title">Smart insights <small>Auto-generated from the selected period</small></h3><div id="insights" class="insights"></div></div>
       <div class="grid kpis">
         <div class="panel kpi"><div class="kpi-label">Total devices</div><div class="kpi-value" id="totalDevices">—</div><div class="kpi-note">All registered devices</div></div>
         <div class="panel kpi"><div class="kpi-label">Active devices</div><div class="kpi-value" id="activeDevices">—</div><div class="kpi-note">Seen in selected period</div></div>
@@ -138,13 +153,17 @@
         <div class="panel kpi"><div class="kpi-label">Failed</div><div class="kpi-value" id="failed">—</div><div class="kpi-note">Failed download events</div></div>
         <div class="panel kpi"><div class="kpi-label">Success rate</div><div class="kpi-value" id="successRate">—</div><div class="kpi-note">Success ÷ (success + failed)</div></div>
         <div class="panel kpi"><div class="kpi-label">Countries</div><div class="kpi-value" id="countries">—</div><div class="kpi-note">Distinct device countries</div></div>
+        <div class="panel kpi"><div class="kpi-label">New devices</div><div class="kpi-value" id="newDevices">—</div><div class="kpi-note">First seen in period</div></div>
+        <div class="panel kpi"><div class="kpi-label">Downloads / day</div><div class="kpi-value" id="dlPerDay">—</div><div class="kpi-note">Over all days in period</div></div>
+        <div class="panel kpi"><div class="kpi-label">Avg daily users</div><div class="kpi-value" id="avgDau">—</div><div class="kpi-note">Mean unique app_open users / day</div></div>
+        <div class="panel kpi"><div class="kpi-label">Events / active user</div><div class="kpi-value" id="evPerUser">—</div><div class="kpi-note">All app events ÷ active users</div></div>
       </div>
 
       <div class="grid two">
         <div class="panel">
           <h3 class="section-title">Download activity <small id="activityCaption">By day</small></h3>
           <canvas id="activityChart"></canvas>
-          <div class="legend"><span><i class="dot"></i>Download events</span></div>
+          <div class="legend"><span><i class="dot" style="background:var(--green)"></i>Success</span><span><i class="dot" style="background:var(--red)"></i>Failed</span><span><i class="dot" style="background:#555"></i>Other</span><span><i class="dot" style="background:var(--yellow)"></i>7-day average</span></div>
         </div>
         <div class="panel">
           <h3 class="section-title">Download outcomes</h3>
@@ -163,6 +182,14 @@
           <canvas id="platformChart"></canvas>
         </div>
       </div>
+
+      <div class="grid two" style="margin-bottom:14px">
+        <div class="panel"><h3 class="section-title">Daily active users <small>Unique app_open users per day</small></h3><canvas id="dauChart"></canvas></div>
+        <div class="panel"><h3 class="section-title">Failure analysis <small>Failed ÷ (success + failed)</small></h3>
+          <div class="sub" style="margin:-8px 0 10px">By platform</div><div id="failPlatform" class="list"></div>
+          <div class="sub" style="margin:16px 0 10px">By format</div><div id="failFormat" class="list"></div></div>
+      </div>
+      <div class="panel" style="margin-bottom:14px"><h3 class="section-title">When users download <small>Hour × weekday, your local time</small></h3><div id="heatmap"></div></div>
 
       <div class="grid three">
         <div class="panel"><h3 class="section-title">Top countries</h3><div id="countryList" class="list"></div></div>
@@ -196,11 +223,12 @@
           <button class="btn secondary" onclick="exportSummaryReport()">Export analytics report</button>
         </div>
         <div class="table-wrap">
-          <table><thead><tr><th>Platform / source</th><th>Format</th><th>Status</th><th>Date</th></tr></thead><tbody id="downloadRows"></tbody></table>
+          <table><thead><tr><th class="sortable" data-k="source_domain" onclick="sortBy('source_domain')">Platform / source</th><th class="sortable" data-k="format" onclick="sortBy('format')">Format</th><th class="sortable" data-k="status" onclick="sortBy('status')">Status</th><th class="sortable" data-k="created_at" onclick="sortBy('created_at')">Date ▼</th></tr></thead><tbody id="downloadRows"></tbody></table>
         </div>
         <div class="pagination"><span id="pageInfo">Page 1</span><div class="actions"><button class="chip" onclick="changePage(-1)">Previous</button><button class="chip" onclick="changePage(1)">Next</button></div></div>
       </div>
     </section>
+    <div id="tip"></div>
     <div class="foot">EDGE VIDEO DOWNLOADER · PRIVATE ADMIN DASHBOARD</div>
   </main>
 
@@ -290,9 +318,9 @@
     const all = [];
     const batch = 1000;
     for (let from=0; ; from+=batch) {
-      let query = sb.from(table).select(columns).range(from, from+batch-1);
-      const start = dateColumn ? startDate() : null;
-      if (start) query = query.gte(dateColumn, start);
+      let query = sb.from(table).select(columns).order(dateColumn,{ascending:false}).range(from, from+batch-1);
+      const bd = bounds(), low = bd.ps ?? bd.s;
+      if (low !== null) query = query.gte(dateColumn, new Date(low).toISOString());
       if (dateColumn && customEnd) query = query.lte(dateColumn, customEnd + "T23:59:59.999");
       const { data, error } = await query;
       if (error) throw new Error(table + ": " + error.message);
@@ -307,6 +335,7 @@
     for (let from=0; ; from+=batch) {
       const { data, error } = await sb.from("devices")
         .select("manufacturer,model,android_version,app_version,country,first_seen,last_seen")
+        .order("first_seen",{ascending:true}).order("last_seen",{ascending:true})
         .range(from, from+batch-1);
       if (error) throw new Error("devices: " + error.message);
       all.push(...(data || []));
@@ -314,20 +343,22 @@
     }
     return all;
   }
-  async function loadAnalytics() {
-    $("loading").classList.remove("hidden");
-    $("dashboardContent").classList.add("hidden");
+  async function loadAnalytics(silent=false) {
+    if (silent !== true) { $("loading").classList.remove("hidden"); $("dashboardContent").classList.add("hidden"); }
     $("refreshBtn").disabled = true;
     hideNotice();
     try {
+      const b = bounds();
       const [d, dl, ev] = await Promise.all([
         getAllDevices(),
         getAllRows("download_events", "source_domain,status,format,created_at", "created_at"),
         getAllRows("app_events", "event_name,created_at,user_id", "created_at")
       ]);
+      const cut = rows => { const cur=[], prev=[]; rows.forEach(x=>{ const t=+new Date(x.created_at); (b.s!==null && t<b.s ? prev : cur).push(x); }); return [cur,prev]; };
       devices = d;
-      downloads = dl.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-      events = ev;
+      [downloads, prevDownloads] = cut(dl);
+      [events, prevEvents] = cut(ev);
+      downloads.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
       renderDashboard();
       $("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
       $("dashboardContent").classList.remove("hidden");
@@ -384,20 +415,14 @@
     renderList("formatList", countBy(downloads,x=>x.format));
     renderList("eventList", countBy(events,x=>x.event_name));
     renderDailySummary();
-    drawActivity();
+    renderAdvanced(success,failed);
+    drawDaily();
     drawResults(success,failed,downloads.length-success-failed);
     drawDeviceGrowth();
     drawPlatformBreakdown();
     populatePlatformFilter();
     currentPage = 1;
     renderDownloads();
-  }
-  function renderDailySummary() {
-    if (!downloads.length) { renderList("summaryList",[]); return; }
-    const days = countBy(downloads,x=>new Date(x.created_at).toLocaleDateString());
-    const peak = days[0];
-    const avg = downloads.length / Math.max(1, new Set(downloads.map(x=>new Date(x.created_at).toDateString())).size);
-    renderList("summaryList", [["Downloads / day",avg.toFixed(1)],["Peak day",peak[0]+" ("+peak[1]+")"],["Days with downloads",days.length]], 5);
   }
 
   function setupCanvas(canvas) {
@@ -408,38 +433,6 @@
     const ctx = canvas.getContext("2d");
     ctx.setTransform(ratio,0,0,ratio,0,0);
     return {ctx,w:rect.width,h:rect.height};
-  }
-  function drawActivity() {
-    const canvas = $("activityChart"), {ctx,w,h} = setupCanvas(canvas);
-    ctx.clearRect(0,0,w,h);
-    const grouped = new Map();
-    downloads.forEach(x=>{
-      const d = new Date(x.created_at);
-      if (!Number.isFinite(d.getTime())) return;
-      const key = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-      grouped.set(key,(grouped.get(key)||0)+1);
-    });
-    let keys = [...grouped.keys()].sort();
-    if (!keys.length) { ctx.fillStyle="#888";ctx.font="12px Arial";ctx.fillText("No download activity",12,25);return; }
-    const first = new Date(keys[0]+"T00:00:00"), last = new Date(keys[keys.length-1]+"T00:00:00");
-    const span = Math.max(1,Math.round((last-first)/86400000)+1);
-    const maxDays = Math.min(span, selectedRange==="all" && !customStart ? 365 : 180);
-    if (span > maxDays) {
-      const cutoff = new Date(last); cutoff.setDate(cutoff.getDate()-maxDays+1);
-      keys = keys.filter(k=>new Date(k+"T00:00:00")>=cutoff);
-    }
-    $("activityCaption").textContent = keys.length+" days with activity";
-    const vals = keys.map(k=>grouped.get(k)||0), max = Math.max(1,...vals);
-    const left=34,right=10,top=12,bottom=28, cw=w-left-right,ch=h-top-bottom;
-    ctx.strokeStyle="#303030";ctx.lineWidth=1;ctx.fillStyle="#888";ctx.font="10px Arial";
-    for(let i=0;i<=4;i++){const y=top+ch*i/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();ctx.fillText(String(Math.round(max*(1-i/4))),3,y+3);}
-    ctx.strokeStyle="#f0f0f0";ctx.lineWidth=2;ctx.beginPath();
-    vals.forEach((v,i)=>{const x=left+(keys.length===1?cw/2:i*cw/(keys.length-1));const y=top+ch-(v/max)*ch;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
-    ctx.stroke();
-    ctx.fillStyle="#eee"; vals.forEach((v,i)=>{const x=left+(keys.length===1?cw/2:i*cw/(keys.length-1));const y=top+ch-(v/max)*ch;ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fill();});
-    ctx.fillStyle="#888";ctx.font="10px Arial";
-    const labelCount=Math.min(5,keys.length);
-    for(let i=0;i<labelCount;i++){const idx=Math.round(i*(keys.length-1)/Math.max(1,labelCount-1));const x=left+(keys.length===1?cw/2:idx*cw/(keys.length-1));ctx.fillText(keys[idx].slice(5),Math.max(left,x-14),h-8);}
   }
   function drawResults(success,failed,other) {
     const canvas=$("resultChart"),{ctx,w,h}=setupCanvas(canvas);
@@ -498,7 +491,7 @@
     select.innerHTML='<option value="">All platforms</option>'+values.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
     if(values.includes(current)) select.value=current;
   }
-  function filteredDownloads() {
+  function baseFiltered() {
     const q=$("downloadSearch").value.trim().toLowerCase();
     const platform=$("platformFilter").value;
     const status=$("statusFilter").value;
@@ -604,12 +597,168 @@
     } catch(e) { status.textContent="Failed: "+e.message; }
   }
 
+
+  // ===================== Advanced analytics =====================
+  let prevDownloads=[], prevEvents=[], sortKey="created_at", sortDir=-1, autoTimer=null;
+  const dayKey=v=>{const d=new Date(v);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+  const pct=(a,b)=>b?a/b*100:null;
+  const isOpen=x=>String(x.event_name).toLowerCase()==="app_open";
+  const esc=escapeHtml;
+  function bounds(){
+    const e=customEnd?new Date(customEnd+"T23:59:59.999").getTime():Date.now();
+    const s0=startDate(), s=s0?new Date(s0).getTime():null;
+    return {s,e,ps:s!==null?s-(e-s):null};
+  }
+  function dayKeys(){
+    const b=bounds(), end=Math.min(b.e,Date.now());
+    let s=b.s;
+    if(s===null){ downloads.forEach(x=>{const t=+new Date(x.created_at); if(Number.isFinite(t)&&(s===null||t<s)) s=t;}); if(s===null) return []; }
+    const out=[], d=new Date(s); d.setHours(0,0,0,0);
+    while(d.getTime()<=end && out.length<400){ out.push(dayKey(d)); d.setDate(d.getDate()+1); }
+    return out;
+  }
+  function dailyTotals(keys){ const m={}; keys.forEach(k=>m[k]=0); downloads.forEach(x=>{const k=dayKey(x.created_at); if(k in m) m[k]++;}); return keys.map(k=>m[k]); }
+  function dauSeries(keys){ const m={}; keys.forEach(k=>m[k]=new Set()); events.forEach(x=>{ if(isOpen(x)&&x.user_id){const k=dayKey(x.created_at); if(k in m) m[k].add(x.user_id);} }); return keys.map(k=>m[k].size); }
+
+  function drawStacked(id,keys,layers,line){
+    const c=$(id), {ctx,w,h}=setupCanvas(c); ctx.clearRect(0,0,w,h); c._m=null;
+    if(!keys.length){ctx.fillStyle="#888";ctx.font="12px Arial";ctx.fillText("No data in this period",12,25);return;}
+    const tot=keys.map((_,i)=>layers.reduce((s,l)=>s+l.vals[i],0)), max=Math.max(1,...tot,...(line||[]));
+    const L=34,R=10,T=12,B=28,cw=w-L-R,ch=h-T-B,step=cw/keys.length,bw=Math.max(1,Math.min(26,step*.72));
+    ctx.strokeStyle="#303030";ctx.lineWidth=1;ctx.fillStyle="#888";ctx.font="10px Arial";
+    for(let i=0;i<=4;i++){const y=T+ch*i/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();ctx.fillText(String(Math.round(max*(1-i/4))),3,y+3);}
+    keys.forEach((k,i)=>{let y=T+ch;const x=L+i*step+(step-bw)/2;layers.forEach(l=>{const v=l.vals[i]/max*ch;y-=v;ctx.fillStyle=l.color;ctx.fillRect(x,y,bw,v);});});
+    if(line){ctx.strokeStyle="#e9c46a";ctx.lineWidth=2;ctx.beginPath();line.forEach((v,i)=>{const x=L+i*step+step/2,y=T+ch-v/max*ch;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
+    ctx.fillStyle="#888";ctx.font="10px Arial";
+    const n=Math.min(5,keys.length);
+    for(let i=0;i<n;i++){const idx=Math.round(i*(keys.length-1)/Math.max(1,n-1));ctx.fillText(keys[idx].slice(5),Math.max(L,L+idx*step-8),h-8);}
+    c._m={keys,layers,line,L,step};
+  }
+  function drawDaily(){
+    const keys=dayKeys(), m={}; keys.forEach(k=>m[k]=[0,0,0]);
+    downloads.forEach(x=>{const k=dayKey(x.created_at); if(m[k]) m[k][isSuccess(x.status)?0:isFailed(x.status)?1:2]++;});
+    const layers=[["Success","#55d68b"],["Failed","#ff6868"],["Other","#555"]].map(([name,color],j)=>({name,color,vals:keys.map(k=>m[k][j])}));
+    const tot=keys.map((_,i)=>layers[0].vals[i]+layers[1].vals[i]+layers[2].vals[i]);
+    const ma=tot.map((_,i)=>{const a=tot.slice(Math.max(0,i-6),i+1);return a.reduce((s,v)=>s+v,0)/a.length;});
+    $("activityCaption").textContent=keys.length+" days (zero days included)";
+    drawStacked("activityChart",keys,layers,ma);
+    drawStacked("dauChart",keys,[{name:"Active users",color:"#8ab4ff",vals:dauSeries(keys)}]);
+  }
+  ["activityChart","dauChart"].forEach(id=>{
+    const c=$(id), tip=$("tip");
+    c.addEventListener("mousemove",e=>{
+      const m=c._m; if(!m){tip.style.display="none";return;}
+      const r=c.getBoundingClientRect(), i=Math.floor((e.clientX-r.left-m.L)/m.step);
+      if(i<0||i>=m.keys.length){tip.style.display="none";return;}
+      tip.innerHTML="<b>"+m.keys[i]+"</b><br>"+m.layers.map(l=>`<span style="color:${l.color}">●</span> ${l.name}: ${l.vals[i]}`).join("<br>")+(m.line?"<br><span style='color:#e9c46a'>●</span> 7-day avg: "+m.line[i].toFixed(1):"");
+      tip.style.display="block";tip.style.left=Math.min(e.clientX+14,innerWidth-170)+"px";tip.style.top=(e.clientY+14)+"px";
+    });
+    c.addEventListener("mouseleave",()=>tip.style.display="none");
+  });
+
+  function setDelta(id,cur,prev,o={}){
+    const note=$(id).nextElementSibling; let el=note.querySelector(".delta");
+    if(!el){el=document.createElement("span");el.className="delta";note.appendChild(el);}
+    if(prev==null||cur==null||!Number.isFinite(prev)||(prev===0&&cur===0)){el.textContent="";return;}
+    let d,txt;
+    if(o.pts){d=cur-prev;txt=(d>=0?"▲ ":"▼ ")+Math.abs(d).toFixed(1)+" pts";}
+    else if(prev===0){d=1;txt="▲ new";}
+    else{d=(cur-prev)/prev*100;txt=(d>=0?"▲ ":"▼ ")+Math.abs(d).toFixed(1)+"%";}
+    const good=o.invert?d<0:d>0;
+    el.className="delta "+(d===0?"":good?"up":"down");
+    el.textContent=" "+txt+" vs prev";
+  }
+  function failRows(id,keyFn){
+    const m=new Map();
+    downloads.forEach(x=>{const o=outcome(x.status); if(o==="other")return; const k=safe(keyFn(x)), r=m.get(k)||[0,0]; r[o==="failed"?1:0]++; m.set(k,r);});
+    const rows=[...m].map(([k,[s,f]])=>({k,n:s+f,f,r:f/(s+f)*100})).sort((a,b)=>(b.n>=5)-(a.n>=5)||b.r-a.r||b.n-a.n).slice(0,6);
+    $(id).innerHTML=rows.length?rows.map(r=>`<div><div class="list-row"><span class="list-name" title="${esc(r.k)}">${esc(r.k)}</span><span class="list-count">${r.r.toFixed(1)}% · ${r.f}/${r.n}${r.n<5?" · low sample":""}</span></div><div class="bar"><span style="width:${Math.max(2,r.r)}%;background:${r.r>=25?"var(--red)":r.r>=10?"var(--yellow)":"var(--green)"}"></span></div></div>`).join(""):'<div class="empty">No success/failed events</div>';
+    return rows;
+  }
+  const vcmp=(a,b)=>{const x=String(a).split(/[.\-+]/),y=String(b).split(/[.\-+]/);for(let i=0;i<Math.max(x.length,y.length);i++){const d=(parseInt(x[i])||0)-(parseInt(y[i])||0);if(d)return d;}return 0;};
+
+  function renderAdvanced(s,f){
+    const b=bounds(), hasPrev=b.s!==null, known=s+f, rate=pct(s,known);
+    const ps=prevDownloads.filter(x=>isSuccess(x.status)).length, pf=prevDownloads.filter(x=>isFailed(x.status)).length, prate=pct(ps,ps+pf);
+    const au=new Set(events.filter(x=>isOpen(x)&&x.user_id).map(x=>x.user_id));
+    const pau=new Set(prevEvents.filter(x=>isOpen(x)&&x.user_id).map(x=>x.user_id));
+    const newDev=devices.filter(x=>inSelectedPeriod(x.first_seen)).length;
+    const prevNew=hasPrev?devices.filter(x=>{const t=+new Date(x.first_seen);return t>=b.ps&&t<b.s;}).length:null;
+    const keys=dayKeys(), n=keys.length||1, tot=dailyTotals(keys), dau=dauSeries(keys);
+    const P=hasPrev;
+    setDelta("totalDownloads",downloads.length,P?prevDownloads.length:null);
+    setDelta("successful",s,P?ps:null);
+    setDelta("failed",f,P?pf:null,{invert:true});
+    setDelta("successRate",rate,P?prate:null,{pts:true});
+    setDelta("activeUsers",au.size,P?pau.size:null);
+    $("newDevices").textContent=newDev.toLocaleString(); setDelta("newDevices",newDev,prevNew);
+    $("dlPerDay").textContent=(downloads.length/n).toFixed(1);
+    $("avgDau").textContent=dau.length?(dau.reduce((a,v)=>a+v,0)/dau.length).toFixed(1):"—";
+    $("evPerUser").textContent=au.size?(events.length/au.size).toFixed(1):"—";
+    $("successRate").textContent=rate!=null?rate.toFixed(1)+"%":"—";
+
+    // Heatmap (hour x weekday)
+    const H=Array.from({length:7},()=>Array(24).fill(0)), wd=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    downloads.forEach(x=>{const d=new Date(x.created_at); if(!isNaN(d)) H[d.getDay()][d.getHours()]++;});
+    const mx=Math.max(1,...H.flat());
+    $("heatmap").innerHTML='<div></div>'+[...Array(24).keys()].map(h=>`<div class="hl">${h%3===0?h:""}</div>`).join("")+
+      H.map((r,i)=>`<div class="hl">${wd[i]}</div>`+r.map((v,h)=>`<div class="hc" style="background:rgba(85,214,139,${v?(.14+.86*v/mx).toFixed(2):.04})" title="${wd[i]} ${h}:00 — ${v} downloads"></div>`).join("")).join("");
+
+    const fp=failRows("failPlatform",x=>x.source_domain), ff=failRows("failFormat",x=>x.format);
+
+    // Insights
+    const I=[], add=(t,m)=>I.push(`<div class="ins ${t}"><b>${{ok:"✓",warn:"!",info:"i"}[t]}</b><span>${m}</span></div>`);
+    if(known){
+      if(P&&prate!=null){const d=rate-prate;add(d<=-5?"warn":d>=2?"ok":"info",`Success rate is <b>${rate.toFixed(1)}%</b>, ${Math.abs(d)<.05?"unchanged":(d>0?"up ":"down ")+Math.abs(d).toFixed(1)+" pts"} vs the previous period.`);}
+      else add(rate<90?"warn":"ok",`Success rate is <b>${rate.toFixed(1)}%</b> across ${known.toLocaleString()} completed downloads.`);
+    } else add("info","No success/failed download events in this period yet.");
+    if(P&&prevDownloads.length&&downloads.length){const d=(downloads.length-prevDownloads.length)/prevDownloads.length*100;add(d>=10?"ok":d<=-10?"warn":"info",`Downloads are <b>${d>=0?"up":"down"} ${Math.abs(d).toFixed(1)}%</b> (${downloads.length.toLocaleString()} vs ${prevDownloads.length.toLocaleString()}).`);}
+    const w1=fp.find(r=>r.n>=10&&r.r>=10); if(w1) add("warn",`<b>${esc(w1.k)}</b> fails <b>${w1.r.toFixed(1)}%</b> of downloads (${w1.f} of ${w1.n}), your biggest reliability gap.`);
+    const w2=ff.find(r=>r.n>=10&&r.r>=10); if(w2) add("warn",`Format <b>${esc(w2.k)}</b> fails <b>${w2.r.toFixed(1)}%</b> of the time (${w2.f} of ${w2.n}).`);
+    if(downloads.length>=20){
+      const hr=Array(24).fill(0), dw=Array(7).fill(0); H.forEach((r,i)=>r.forEach((v,h)=>{hr[h]+=v;dw[i]+=v;}));
+      const ph=hr.indexOf(Math.max(...hr)), pd=dw.indexOf(Math.max(...dw));
+      add("info",`Peak activity is <b>${ph}:00–${ph+1}:00</b> (your local time), busiest day is <b>${wd[pd]}</b>. Schedule announcements and releases around this window.`);
+    }
+    const plats=countBy(downloads,x=>x.source_domain);
+    if(plats.length>1&&downloads.length>=20){const sh=plats[0][1]/downloads.length*100; if(sh>=50) add("info",`<b>${esc(plats[0][0])}</b> drives <b>${sh.toFixed(0)}%</b> of downloads. Any extractor break there hits most users.`);}
+    if(tot.length>=7){
+      const mean=tot.reduce((a,v)=>a+v,0)/tot.length, sd=Math.sqrt(tot.reduce((a,v)=>a+(v-mean)**2,0)/tot.length);
+      const mi=tot.indexOf(Math.max(...tot));
+      if(sd>0&&tot[mi]>=5&&(tot[mi]-mean)/sd>=2) add("info",`Unusual spike on <b>${keys[mi]}</b>: ${tot[mi]} downloads, ${((tot[mi]-mean)/sd).toFixed(1)}σ above the daily average of ${mean.toFixed(1)}.`);
+      const z=tot.filter(v=>!v).length; if(z) add(z/tot.length>.25?"warn":"info",`<b>${z}</b> of ${tot.length} days had zero downloads.`);
+    }
+    const vers=countBy(devices.filter(x=>x.app_version),x=>x.app_version);
+    if(vers.length>1){
+      const latest=vers.map(v=>v[0]).sort(vcmp).pop(), cnt=vers.find(v=>v[0]===latest)[1], all=vers.reduce((a,v)=>a+v[1],0);
+      add(cnt/all<.5?"warn":"ok",`<b>${(cnt/all*100).toFixed(0)}%</b> of devices run the latest version (<b>${esc(latest)}</b>); ${(100-cnt/all*100).toFixed(0)}% are on older builds.`);
+    }
+    if(P&&newDev) add(prevNew!=null&&newDev>=prevNew?"ok":"info",`<b>${newDev.toLocaleString()}</b> new device${newDev===1?"":"s"} registered${prevNew!=null?` (previous period: ${prevNew.toLocaleString()})`:""}.`);
+    const unk=devices.filter(x=>!x.country).length;
+    if(devices.length&&unk/devices.length>.1) add("warn",`Data quality: <b>${(unk/devices.length*100).toFixed(0)}%</b> of devices have no country recorded, so country stats undercount.`);
+    $("insights").innerHTML=I.join("");
+  }
+
+  function sortBy(k){
+    if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=k==="created_at"?-1:1;}
+    document.querySelectorAll("th.sortable").forEach(th=>{th.textContent=th.textContent.replace(/ [▲▼]$/,"")+(th.dataset.k===sortKey?(sortDir>0?" ▲":" ▼"):"");});
+    currentPage=1; renderDownloads();
+  }
+  function filteredDownloads(){
+    const rows=baseFiltered().slice();
+    return rows.sort((a,b)=>sortKey==="created_at"?sortDir*(new Date(a.created_at)-new Date(b.created_at)):sortDir*safe(a[sortKey]).localeCompare(safe(b[sortKey])));
+  }
+  function setAuto(v){
+    clearInterval(autoTimer); autoTimer=null;
+    if(+v) autoTimer=setInterval(()=>{ if(!$("appView").classList.contains("hidden")) loadAnalytics(true); },+v*1000);
+  }
+
   let resizeTimer;
   window.addEventListener("resize",()=>{
     clearTimeout(resizeTimer);
     resizeTimer=setTimeout(()=>{
       if(!$("dashboardContent").classList.contains("hidden")){
-        drawActivity();
+        drawDaily();
         drawDeviceGrowth();
         drawPlatformBreakdown();
         const s=downloads.filter(x=>isSuccess(x.status)).length;
