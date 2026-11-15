@@ -739,6 +739,13 @@
     $("insights").innerHTML=I.join("");
   }
 
+  function renderDailySummary(){
+    if(!downloads.length){renderList("summaryList",[]);return;}
+    const keys=dayKeys(), t=dailyTotals(keys), n=keys.length||1, tot=downloads.length;
+    const pk=t.indexOf(Math.max(...t)), sd=[...t].sort((a,b)=>a-b);
+    const med=sd.length%2?sd[(sd.length-1)/2]:(sd[sd.length/2-1]+sd[sd.length/2])/2;
+    renderList("summaryList",[["Avg / day",(tot/n).toFixed(1)],["Median / day",med],["Peak day",keys[pk]+" ("+t[pk]+")"],["Zero-download days",t.filter(v=>!v).length+" of "+n]],5);
+  }
   function sortBy(k){
     if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=k==="created_at"?-1:1;}
     document.querySelectorAll("th.sortable").forEach(th=>{th.textContent=th.textContent.replace(/ [▲▼]$/,"")+(th.dataset.k===sortKey?(sortDir>0?" ▲":" ▼"):"");});
