@@ -191,6 +191,14 @@
       </div>
       <div class="panel" style="margin-bottom:14px"><h3 class="section-title">When users download <small>Hour × weekday, your local time</small></h3><div id="heatmap"></div></div>
 
+      <div class="panel" style="margin-bottom:14px">
+        <h3 class="section-title">Downloads by country <small>Where downloads work and where they fail (selected period)</small></h3>
+        <div class="table-wrap">
+          <table><thead><tr><th>Country</th><th>Downloads</th><th>Success</th><th>Failed</th><th>Success rate</th></tr></thead><tbody id="countryRows"></tbody></table>
+        </div>
+        <div class="sub" style="margin-top:10px">Country is the one saved for the phone. Phones with no country saved show as Unknown.</div>
+      </div>
+
       <div class="grid three">
         <div class="panel"><h3 class="section-title">Top countries</h3><div id="countryList" class="list"></div></div>
         <div class="panel"><h3 class="section-title">Device models</h3><div id="modelList" class="list"></div></div>
@@ -241,7 +249,7 @@
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let selectedRange = "30";
   let customStart = null, customEnd = null;
-  let devices = [], downloads = [], events = [];
+  let devices = [], rawDevices = [], mergedCount = 0, downloads = [], events = [];
   let currentPage = 1;
   const PAGE_SIZE = 20;
 
@@ -334,7 +342,7 @@
     const batch = 1000;
     for (let from=0; ; from+=batch) {
       const { data, error } = await sb.from("devices")
-        .select("manufacturer,model,android_version,app_version,country,first_seen,last_seen")
+        .select("user_id,manufacturer,model,android_version,app_version,country,first_seen,last_seen")
         .order("first_seen",{ascending:true}).order("last_seen",{ascending:true})
         .range(from, from+batch-1);
       if (error) throw new Error("devices: " + error.message);
@@ -351,11 +359,12 @@
       const b = bounds();
       const [d, dl, ev] = await Promise.all([
         getAllDevices(),
-        getAllRows("download_events", "source_domain,status,format,created_at", "created_at"),
+        getAllRows("download_events", "source_domain,status,format,created_at,user_id", "created_at"),
         getAllRows("app_events", "event_name,created_at,user_id", "created_at")
       ]);
       const cut = rows => { const cur=[], prev=[]; rows.forEach(x=>{ const t=+new Date(x.created_at); (b.s!==null && t<b.s ? prev : cur).push(x); }); return [cur,prev]; };
-      devices = d;
+      rawDevices = d;
+      devices = mergeReinstalls(d);
       [downloads, prevDownloads] = cut(dl);
       [events, prevEvents] = cut(ev);
       downloads.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
@@ -368,6 +377,55 @@
       $("loading").classList.add("hidden");
       $("refreshBtn").disabled = false;
     }
+  }
+
+  /*
+   * When a phone loses its anonymous ID (for example the person uninstalled the old version
+   * to install the new one), the app registers again and the dashboard sees a "new device".
+   * This joins such a pair back into ONE device: same phone model, Android version and
+   * country, the older row stopped being seen right before the newer row appeared (within
+   * 30 days), and the newer row runs a higher app version. The merged device keeps the
+   * ORIGINAL first_seen date, so it is not counted as new.
+   * It is an estimate, and the Total devices note says how many were merged.
+   */
+  function mergeReinstalls(list) {
+    const GAP = 30 * 86400000;
+    const fp = d => [d.manufacturer, d.model, d.android_version, d.country]
+      .map(v => String(v || "").trim().toLowerCase()).join("|");
+    const t = v => { const x = +new Date(v); return Number.isFinite(x) ? x : null; };
+    const groups = new Map();
+    list.forEach(d => { const k = fp(d); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(d); });
+    const out = [];
+    mergedCount = 0;
+    groups.forEach(group => {
+      if (group.length > 1) {
+        const order = [...group].sort((a, b) => (t(a.first_seen) ?? 0) - (t(b.first_seen) ?? 0));
+        for (const n of order) {
+          const at = group.indexOf(n);
+          if (at < 0) continue;                    // already merged into another row
+          const nf = t(n.first_seen);
+          if (nf == null) continue;
+          let best = null, bestGap = Infinity;
+          for (const o of group) {
+            if (o === n) continue;
+            const ol = t(o.last_seen);
+            if (ol == null || ol > nf) continue;   // the old row must have stopped before this one appeared
+            if (vcmp(n.app_version || "0", o.app_version || "0") <= 0) continue;  // and run an older version
+            const gap = nf - ol;
+            if (gap > GAP) continue;
+            if (gap < bestGap) { best = o; bestGap = gap; }
+          }
+          if (best) {
+            const merged = Object.assign({}, n, { first_seen: best.first_seen });
+            group.splice(group.indexOf(n), 1);
+            group[group.indexOf(best)] = merged;
+            mergedCount++;
+          }
+        }
+      }
+      out.push(...group);
+    });
+    return out;
   }
 
   function countBy(rows, keyFn) {
@@ -398,6 +456,9 @@
     const activeUsers = new Set(events.filter(x=>String(x.event_name).toLowerCase()==="app_open" && x.user_id).map(x=>x.user_id)).size;
     const countryCount = new Set(devices.map(x=>x.country).filter(Boolean)).size;
     $("totalDevices").textContent = devices.length.toLocaleString();
+    $("totalDevices").nextElementSibling.textContent = mergedCount
+      ? "All devices · " + mergedCount + " re-registration" + (mergedCount === 1 ? "" : "s") + " after updates merged"
+      : "All registered devices";
     $("activeDevices").textContent = activeDevices.toLocaleString();
     $("totalDownloads").textContent = downloads.length.toLocaleString();
     $("activeUsers").textContent = activeUsers.toLocaleString();
@@ -415,6 +476,7 @@
     renderList("formatList", countBy(downloads,x=>x.format));
     renderList("eventList", countBy(events,x=>x.event_name));
     renderDailySummary();
+    renderCountryDownloads();
     renderAdvanced(success,failed);
     drawDaily();
     drawResults(success,failed,downloads.length-success-failed);
@@ -737,6 +799,25 @@
     const unk=devices.filter(x=>!x.country).length;
     if(devices.length&&unk/devices.length>.1) add("warn",`Data quality: <b>${(unk/devices.length*100).toFixed(0)}%</b> of devices have no country recorded, so country stats undercount.`);
     $("insights").innerHTML=I.join("");
+  }
+
+  function renderCountryDownloads(){
+    const countryOf=new Map();
+    rawDevices.forEach(d=>{ if(d.user_id) countryOf.set(d.user_id, d.country || "Unknown"); });
+    const m=new Map();
+    downloads.forEach(x=>{
+      const c=(x.user_id && countryOf.get(x.user_id)) || "Unknown";
+      const r=m.get(c)||{n:0,s:0,f:0};
+      r.n++;
+      if(isSuccess(x.status)) r.s++; else if(isFailed(x.status)) r.f++;
+      m.set(c,r);
+    });
+    const rows=[...m].sort((a,b)=>b[1].n-a[1].n);
+    $("countryRows").innerHTML=rows.length?rows.map(([c,r])=>{
+      const known=r.s+r.f, rate=known?r.s/known*100:null;
+      const color=rate==null?"#aaa":rate>=90?"var(--green)":rate>=75?"var(--yellow)":"var(--red)";
+      return `<tr><td>${escapeHtml(c)}</td><td>${r.n.toLocaleString()}</td><td>${r.s.toLocaleString()}</td><td>${r.f.toLocaleString()}</td><td style="color:${color}">${rate==null?"—":rate.toFixed(1)+"%"}${known&&known<5?" (low sample)":""}</td></tr>`;
+    }).join(""):'<tr><td colspan="5" class="empty">No downloads in this period</td></tr>';
   }
 
   function renderDailySummary(){
